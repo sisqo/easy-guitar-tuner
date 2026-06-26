@@ -130,6 +130,7 @@ export default function App() {
           activeCents={activeCents}
           onStringSelect={handleLockToggle}
           onPlay={playNote}
+          dark={dark}
         />
       </main>
 
