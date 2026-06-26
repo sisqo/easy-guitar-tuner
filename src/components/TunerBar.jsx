@@ -3,6 +3,7 @@ import { isInTune } from '../utils/noteUtils'
 
 const CENTS_RANGE = 50
 const DISPLAY_SMOOTH = 0.2  // EMA for the visual indicator
+const TICKS = [-50, -40, -30, -20, -10, 0, 10, 20, 30, 40, 50]
 
 export default function TunerBar({ cents, note, listening, lockedString }) {
   const displayCentsRef = useRef(0)
@@ -20,7 +21,7 @@ export default function TunerBar({ cents, note, listening, lockedString }) {
   const inTune = note && isInTune(cents ?? 0, 3)
   const hasSignal = note !== null && note !== undefined
 
-  const barColor = !hasSignal
+  const indicatorColor = !hasSignal
     ? 'bg-zinc-600'
     : inTune
     ? 'bg-emerald-500'
@@ -56,16 +57,32 @@ export default function TunerBar({ cents, note, listening, lockedString }) {
       </div>
 
       {/* Tuner bar */}
-      <div className="relative h-4 rounded-full bg-zinc-800 overflow-hidden">
-        {/* Zone markers at ±5 cents */}
-        <div className="absolute inset-y-0 bg-emerald-900/40 rounded-full"
-          style={{ left: 'calc(50% - 5%)', width: '10%' }} />
-        {/* Center marker */}
-        <div className="absolute inset-y-0 left-1/2 w-0.5 bg-zinc-600 -translate-x-1/2 z-10" />
-        {/* Indicator */}
+      <div className="relative h-8 rounded-full bg-zinc-800 overflow-hidden">
+        {/* Green zone: ±5 cents wide */}
         <div
-          className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full shadow-lg z-20 transition-colors duration-75 ${barColor}`}
-          style={{ left: `calc(${pct}% - 8px)` }}
+          className="absolute inset-y-0 bg-emerald-500/20 border-l border-r border-emerald-500/40"
+          style={{ left: '45%', width: '10%' }}
+        />
+
+        {/* Tick marks */}
+        {TICKS.map(tick => {
+          const isCenter = tick === 0
+          const pctPos = tick + 50  // 0..100
+          return (
+            <div
+              key={tick}
+              className={`absolute w-0.5 bg-zinc-600 z-10 ${
+                isCenter ? 'h-5 top-[6px]' : 'h-2.5 top-[11px]'
+              }`}
+              style={{ left: `calc(${pctPos}% - 1px)` }}
+            />
+          )
+        })}
+
+        {/* Indicator dot */}
+        <div
+          className={`absolute top-1/2 -translate-y-1/2 w-5 h-5 rounded-full shadow-lg z-20 transition-colors duration-75 ${indicatorColor}`}
+          style={{ left: `calc(${pct}% - 10px)` }}
         />
       </div>
 

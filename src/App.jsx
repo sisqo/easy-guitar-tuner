@@ -1,15 +1,16 @@
-import { useMemo, useEffect, useState } from 'react'
+import { useMemo, useEffect, useRef, useState } from 'react'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { usePitchDetector } from './hooks/usePitchDetector'
 import { useOscillator } from './hooks/useOscillator'
+import { useSuccessBeep } from './hooks/useSuccessBeep'
 import { getTunings } from './data/tunings'
-import { findClosestString, freqToNoteName, getCents } from './utils/noteUtils'
+import { findClosestString, freqToNoteName, getCents, isInTune } from './utils/noteUtils'
 import ThemeToggle from './components/ThemeToggle'
 import InstrumentTabs from './components/InstrumentTabs'
 import TuningSelector from './components/TuningSelector'
 import DiapasonControl from './components/DiapasonControl'
 import TunerBar from './components/TunerBar'
-import StringGrid from './components/StringGrid'
+import GuitarHeadstock from './components/GuitarHeadstock'
 import MicButton from './components/MicButton'
 
 export default function App() {
@@ -21,6 +22,10 @@ export default function App() {
 
   const { isListening, pitch, error, start, stop } = usePitchDetector()
   const { playNote } = useOscillator()
+  const { beep } = useSuccessBeep()
+
+  const inTuneStartRef = useRef(null)
+  const beepFiredRef = useRef(false)
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
@@ -67,6 +72,21 @@ export default function App() {
     }
   }, [lockedStringId, pitch, strings, diapason])
 
+  // Success beep: fire once when string stays in tune for 1.5 continuous seconds
+  useEffect(() => {
+    if (isInTune(displayCents, 3) && displayNote) {
+      if (inTuneStartRef.current === null) {
+        inTuneStartRef.current = Date.now()
+      } else if (Date.now() - inTuneStartRef.current >= 1500 && !beepFiredRef.current) {
+        beep()
+        beepFiredRef.current = true
+      }
+    } else {
+      inTuneStartRef.current = null
+      beepFiredRef.current = false
+    }
+  }, [displayCents, displayNote, beep])
+
   const lockedString = lockedStringId !== null ? strings.find(s => s.id === lockedStringId) : null
 
   return (
@@ -103,12 +123,12 @@ export default function App() {
           <DiapasonControl value={diapason} onChange={setDiapason} />
         </div>
 
-        <StringGrid
+        <GuitarHeadstock
           strings={strings}
-          closestStringId={activeStringId}
-          closestCents={activeCents}
+          activeStringId={activeStringId}
           lockedStringId={lockedStringId}
-          onLockToggle={handleLockToggle}
+          activeCents={activeCents}
+          onStringSelect={handleLockToggle}
           onPlay={playNote}
         />
       </main>
