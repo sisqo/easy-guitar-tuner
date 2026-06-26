@@ -2,13 +2,13 @@ import { useRef } from 'react'
 import { isInTune } from '../utils/noteUtils'
 
 const CENTS_RANGE = 50
-const DISPLAY_SMOOTH = 0.12  // EMA for the visual indicator
-const TICKS = [-50, -40, -30, -20, -10, 0, 10, 20, 30, 40, 50]
+const DISPLAY_SMOOTH = 0.12
+// 5 ticks at display-scale positions (-10,-5,0,+5,+10) = (-50,-25,0,+25,+50 cents)
+const TICKS = [-50, -25, 0, 25, 50]
 
-export default function TunerBar({ cents, note, listening, lockedString }) {
+export default function TunerBar({ cents, note, listening }) {
   const displayCentsRef = useRef(0)
 
-  // Smooth the visual position of the indicator
   if (note) {
     displayCentsRef.current = displayCentsRef.current * (1 - DISPLAY_SMOOTH) + (cents ?? 0) * DISPLAY_SMOOTH
   } else {
@@ -20,45 +20,40 @@ export default function TunerBar({ cents, note, listening, lockedString }) {
   const pct = ((clampedCents + CENTS_RANGE) / (CENTS_RANGE * 2)) * 100
   const inTune = note && isInTune(cents ?? 0, 5)
   const hasSignal = note !== null && note !== undefined
+  const isSharp = hasSignal && !inTune && displayCents > 0
+  const isFlat  = hasSignal && !inTune && displayCents < 0
 
-  const indicatorColor = !hasSignal
-    ? 'bg-zinc-600'
-    : inTune
-    ? 'bg-emerald-500'
-    : Math.abs(cents) > 30
-    ? 'bg-red-500'
-    : 'bg-amber-400'
+  // -10 … +10 display scale (50 cents → 10 units)
+  const rawUnit = (cents ?? 0) / 5
+  const displayUnit = Math.max(-10, Math.min(10, Math.round(rawUnit)))
 
-  const centsRounded = Math.round(cents ?? 0)
+  const indicatorColor = !hasSignal ? 'bg-zinc-600'
+    : inTune  ? 'bg-emerald-500'
+    : isSharp ? 'bg-amber-400'
+    : 'bg-sky-400'
+
+  const unitColor = !hasSignal ? 'text-zinc-600'
+    : inTune  ? 'text-emerald-400'
+    : isSharp ? 'text-amber-400'
+    : 'text-sky-400'
 
   return (
-    <div className="flex flex-col gap-3">
-      {/* Target string label when locked */}
-      {lockedString && (
-        <div className="flex items-center justify-center gap-1.5 text-xs text-zinc-500">
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
-          </svg>
-          <span>Locked to <strong className="text-zinc-300">{lockedString.label}</strong> — tap it to unlock</span>
-        </div>
-      )}
-
-      {/* Note name + cents */}
+    <div className="flex flex-col gap-2">
+      {/* Note name + scaled value */}
       <div className="flex items-end justify-center gap-3">
         <span className={`text-6xl font-bold tabular-nums transition-colors ${hasSignal ? 'text-zinc-100' : 'text-zinc-700'}`}>
           {hasSignal ? note : '--'}
         </span>
         {hasSignal && (
-          <span className={`text-lg font-semibold mb-2 tabular-nums w-20
-            ${inTune ? 'text-emerald-400' : Math.abs(centsRounded) > 30 ? 'text-red-400' : 'text-amber-400'}`}>
-            {centsRounded > 0 ? '+' : ''}{centsRounded}¢
+          <span className={`text-lg font-semibold mb-2 tabular-nums w-16 ${unitColor}`}>
+            {displayUnit > 0 ? '+' : ''}{displayUnit}
           </span>
         )}
       </div>
 
       {/* Tuner bar */}
-      <div className="relative h-8 rounded-full bg-zinc-800 overflow-hidden">
-        {/* Green zone: ±5 cents wide */}
+      <div className="relative h-4 rounded-full bg-zinc-800 overflow-hidden">
+        {/* Green zone ±1 unit (±5 cents) */}
         <div
           className="absolute inset-y-0 bg-emerald-500/20 border-l border-r border-emerald-500/40"
           style={{ left: '43%', width: '14%' }}
@@ -67,13 +62,11 @@ export default function TunerBar({ cents, note, listening, lockedString }) {
         {/* Tick marks */}
         {TICKS.map(tick => {
           const isCenter = tick === 0
-          const pctPos = tick + 50  // 0..100
+          const pctPos = tick + 50
           return (
             <div
               key={tick}
-              className={`absolute w-0.5 bg-zinc-600 z-10 ${
-                isCenter ? 'h-5 top-[6px]' : 'h-2.5 top-[11px]'
-              }`}
+              className={`absolute w-0.5 bg-zinc-600 z-10 ${isCenter ? 'h-3 top-[2px]' : 'h-1.5 top-[5px]'}`}
               style={{ left: `calc(${pctPos}% - 1px)` }}
             />
           )
@@ -81,23 +74,19 @@ export default function TunerBar({ cents, note, listening, lockedString }) {
 
         {/* Indicator dot */}
         <div
-          className={`absolute top-1/2 -translate-y-1/2 w-5 h-5 rounded-full shadow-lg z-20 transition-colors duration-75 ${indicatorColor}`}
-          style={{ left: `calc(${pct}% - 10px)` }}
+          className={`absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full shadow-lg z-20 transition-colors duration-75 ${indicatorColor}`}
+          style={{ left: `calc(${pct}% - 7px)` }}
         />
       </div>
 
       {/* Scale labels */}
       <div className="flex justify-between text-xs text-zinc-600 px-0.5">
-        <span>-50¢</span>
+        <span className={isFlat ? 'text-sky-500 font-medium' : ''}>−10</span>
         <span className={`font-semibold ${inTune ? 'text-emerald-500' : 'text-zinc-600'}`}>
           {inTune ? '✓ IN TUNE' : 'TUNE'}
         </span>
-        <span>+50¢</span>
+        <span className={isSharp ? 'text-amber-500 font-medium' : ''}>+10</span>
       </div>
-
-      {!listening && (
-        <p className="text-center text-xs text-zinc-600">Enable mic or play a reference note</p>
-      )}
     </div>
   )
 }

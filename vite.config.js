@@ -2,11 +2,19 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import { webcrypto } from 'crypto'
+import { execSync } from 'child_process'
 
 // Node 18 doesn't expose crypto as a global — polyfill for vite-plugin-pwa/workbox
 if (!globalThis.crypto) globalThis.crypto = webcrypto
 
+const commitCount = execSync('git rev-list --count HEAD').toString().trim()
+const commitHash  = execSync('git rev-parse --short HEAD').toString().trim()
+
 export default defineConfig({
+  define: {
+    __BUILD_COMMITS__: JSON.stringify(commitCount),
+    __BUILD_HASH__: JSON.stringify(commitHash),
+  },
   plugins: [
     react(),
     VitePWA({
@@ -20,11 +28,11 @@ export default defineConfig({
         display: 'standalone',
         orientation: 'portrait',
         icons: [
-          { src: '/vite.svg', sizes: '192x192', type: 'image/svg+xml' },
+          { src: '/logo.png', sizes: '1024x1024', type: 'image/png' },
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,woff2}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
       },
     }),
   ],

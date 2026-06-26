@@ -87,31 +87,31 @@ export default function App() {
     }
   }, [displayCents, displayNote, beep])
 
-  const lockedString = lockedStringId !== null ? strings.find(s => s.id === lockedStringId) : null
-
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
-      <header className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
-        <div>
-          <h1 className="text-base font-bold tracking-tight text-zinc-100">EasyGuitarTuner</h1>
-          <p className="text-xs text-zinc-600">Chromatic tuner</p>
+      <header className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-800">
+        <div className="flex items-center gap-2.5">
+          <img src="/logo.png" alt="" className="w-8 h-8 rounded-lg" />
+          <div>
+            <h1 className="text-base font-bold tracking-tight text-zinc-100 leading-none">EasyGuitarTuner</h1>
+            <p className="text-xs text-zinc-600 mt-0.5">Chromatic tuner</p>
+          </div>
         </div>
         <ThemeToggle dark={dark} onToggle={() => setDark(d => !d)} />
       </header>
 
-      <main className="flex-1 flex flex-col gap-5 px-4 py-5 max-w-lg mx-auto w-full">
+      <main className="flex-1 flex flex-col gap-4 px-4 py-4 max-w-lg mx-auto w-full">
         <InstrumentTabs active={instrument} onChange={handleInstrumentChange} />
 
-        <div className="rounded-2xl bg-zinc-900 border border-zinc-800 p-5 flex flex-col gap-5">
-          <TunerBar
-            cents={displayCents}
-            note={displayNote}
-            listening={isListening}
-            lockedString={lockedString}
-          />
-          <div className="flex justify-center">
-            <MicButton listening={isListening} error={error} onStart={start} onStop={stop} />
+        <div className="rounded-2xl bg-zinc-900 border border-zinc-800 px-4 py-3 flex items-center gap-4">
+          <div className="flex-1">
+            <TunerBar
+              cents={displayCents}
+              note={displayNote}
+              listening={isListening}
+            />
           </div>
+          <MicButton listening={isListening} error={error} onStart={start} onStop={stop} />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -132,6 +132,10 @@ export default function App() {
           onPlay={playNote}
         />
       </main>
+
+      <footer className="text-center text-xs text-zinc-700 py-3">
+        build {__BUILD_COMMITS__} · {__BUILD_HASH__}
+      </footer>
     </div>
   )
 }
