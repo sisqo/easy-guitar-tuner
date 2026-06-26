@@ -17,7 +17,7 @@ export function getTunings(diapason = 440) {
       tunings: {
         standard:    { label: 'Standard (EADGBe)',       strings: buildStrings([['E',2],['A',2],['D',3],['G',3],['B',3],['E',4]], diapason) },
         dropD:       { label: 'Drop D',                  strings: buildStrings([['D',2],['A',2],['D',3],['G',3],['B',3],['E',4]], diapason) },
-        halfDown:    { label: 'Half Step Down (Eb)',      strings: buildStrings([['D#',1],['G#',2],['C#',3],['F#',3],['A#',3],['D#',4]], diapason) },
+        halfDown:    { label: 'Half Step Down (Eb)',      strings: buildStrings([['D#',2],['G#',2],['C#',3],['F#',3],['A#',3],['D#',4]], diapason) },
         fullDown:    { label: 'Full Step Down (D)',       strings: buildStrings([['D',2],['G',2],['C',3],['F',3],['A',3],['D',4]], diapason) },
         dropC:       { label: 'Drop C',                  strings: buildStrings([['C',2],['G',2],['C',3],['F',3],['A',3],['D',4]], diapason) },
         openG:       { label: 'Open G',                  strings: buildStrings([['D',2],['G',2],['D',3],['G',3],['B',3],['D',4]], diapason) },
@@ -46,7 +46,7 @@ export function getTunings(diapason = 440) {
           ['E',4,'E4'], ['E',4,'E4ʼ'],
         ], diapason) },
         halfDown: { label: 'Half Step Down', strings: buildStrings([
-          ['D#',1,'Eb1'], ['D#',2,'Eb2'],
+          ['D#',2,'Eb2'], ['D#',3,'Eb3'],
           ['G#',2,'Ab2'], ['G#',3,'Ab3'],
           ['C#',3,'Db3'], ['C#',4,'Db4'],
           ['F#',3,'Gb3'], ['F#',4,'Gb4'],
