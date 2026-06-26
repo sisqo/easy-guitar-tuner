@@ -2,15 +2,17 @@ import { useRef, useState, useCallback, useEffect } from 'react'
 import { PitchDetector } from 'pitchy'
 
 const NOISE_GATE_RMS = 0.004
-const CLARITY_THRESHOLD = 0.75
+const CLARITY_THRESHOLD = 0.88   // high: reject body resonances and ambient noise
+const MIN_FREQ = 70               // below lowest guitar string (E2=82Hz)
+const MAX_FREQ = 660              // above highest instrument note (B4=494Hz ukulele) + E5 octave margin
 const SMOOTH_FACTOR = 0.15
 const REJECT_THRESHOLD_CENTS = 30  // outlier: too far from smooth but not a new string
 const RESET_THRESHOLD_CENTS = 100  // large jump: treat as new string
-const HOLD_MS = 1500  // keep last reading visible after signal fades
+const HOLD_MS = 1500               // keep last reading visible after signal fades
 
-// Try ÷2, ×1, ×2 and return whichever is closest to reference (single octave correction)
+// Try ÷2, ×1, ×2 and pick whichever is nearest to reference (single octave correction)
 function nearestOctave(detected, reference) {
-  const candidates = [detected / 2, detected, detected * 2].filter(p => p > 50 && p < 2000)
+  const candidates = [detected / 2, detected, detected * 2].filter(p => p >= MIN_FREQ && p <= MAX_FREQ)
   return candidates.reduce((best, p) =>
     Math.abs(Math.log2(p / reference)) < Math.abs(Math.log2(best / reference)) ? p : best
   )
@@ -89,7 +91,7 @@ export function usePitchDetector() {
 
         if (rms >= NOISE_GATE_RMS) {
           const [detectedPitch, clarity] = detector.findPitch(buffer, ctx.sampleRate)
-          if (clarity >= CLARITY_THRESHOLD && detectedPitch > 50 && detectedPitch < 2000) {
+          if (clarity >= CLARITY_THRESHOLD && detectedPitch >= MIN_FREQ && detectedPitch <= MAX_FREQ) {
             const prev = smoothedPitchRef.current
             if (prev === null) {
               smoothedPitchRef.current = detectedPitch
