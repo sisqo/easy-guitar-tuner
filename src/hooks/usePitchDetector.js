@@ -8,6 +8,14 @@ const REJECT_THRESHOLD_CENTS = 30  // outlier: too far from smooth but not a new
 const RESET_THRESHOLD_CENTS = 100  // large jump: treat as new string
 const HOLD_MS = 1500  // keep last reading visible after signal fades
 
+// Try ÷2, ×1, ×2 and return whichever is closest to reference (single octave correction)
+function nearestOctave(detected, reference) {
+  const candidates = [detected / 2, detected, detected * 2].filter(p => p > 50 && p < 2000)
+  return candidates.reduce((best, p) =>
+    Math.abs(Math.log2(p / reference)) < Math.abs(Math.log2(best / reference)) ? p : best
+  )
+}
+
 export function usePitchDetector() {
   const [isListening, setIsListening] = useState(false)
   const [pitch, setPitch] = useState(null)
@@ -88,7 +96,15 @@ export function usePitchDetector() {
             } else {
               const jumpCents = Math.abs(1200 * Math.log2(detectedPitch / prev))
               if (jumpCents > RESET_THRESHOLD_CENTS) {
-                smoothedPitchRef.current = detectedPitch  // new string
+                // Before accepting as a new string, check for octave error
+                const octaveCorrected = nearestOctave(detectedPitch, prev)
+                const correctedJump = Math.abs(1200 * Math.log2(octaveCorrected / prev))
+                if (correctedJump <= REJECT_THRESHOLD_CENTS) {
+                  // Same note, wrong octave detected — correct and smooth
+                  smoothedPitchRef.current = prev * (1 - SMOOTH_FACTOR) + octaveCorrected * SMOOTH_FACTOR
+                } else {
+                  smoothedPitchRef.current = detectedPitch  // genuine new string
+                }
               } else if (jumpCents > REJECT_THRESHOLD_CENTS) {
                 // outlier: discard, keep current smooth
               } else {
