@@ -85,15 +85,19 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
-      <header className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-800">
-        <div className="flex items-center gap-2.5">
-          <img src="/logo.png" alt="" className="w-8 h-8 rounded-lg" />
+      <header className="relative flex items-center justify-center px-4 py-3 border-b border-zinc-800">
+        <div className="flex items-center gap-3">
+          <img src="/logo.png" alt="" className="w-10 h-10 rounded-xl" />
           <div>
-            <h1 className="text-base font-bold tracking-tight text-zinc-100 leading-none">EasyGuitarTuner</h1>
-            <p className="text-xs text-zinc-600 mt-0.5">Chromatic tuner</p>
+            <h1 className="text-lg font-bold tracking-tight text-zinc-100 leading-none">
+              Easy<span style={{ color: '#2aab9e' }}>Guitar</span>Tuner
+            </h1>
+            <p className="text-xs text-zinc-500 mt-0.5 tracking-wide">Chromatic tuner</p>
           </div>
         </div>
-        <ThemeToggle dark={dark} onToggle={() => setDark(d => !d)} />
+        <div className="absolute right-4 top-1/2 -translate-y-1/2">
+          <ThemeToggle dark={dark} onToggle={() => setDark(d => !d)} />
+        </div>
       </header>
 
       <main className="flex-1 flex flex-col gap-4 px-4 py-4 max-w-lg mx-auto w-full">
