@@ -97,14 +97,6 @@ export default function App() {
       </header>
 
       <main className="flex-1 flex flex-col gap-4 px-4 py-4 max-w-lg mx-auto w-full">
-        <div className="rounded-2xl bg-zinc-900 border border-zinc-800 px-5 py-4">
-          <TunerBar
-            cents={displayCents}
-            note={displayNote}
-            listening={isListening}
-          />
-        </div>
-
         <div className="grid grid-cols-2 gap-3">
           <InstrumentTabs active={instrument} onChange={handleInstrumentChange} />
           <TuningSelector
@@ -116,6 +108,14 @@ export default function App() {
 
         <div className="flex justify-center">
           <MicButton listening={isListening} error={error} onStart={start} onStop={stop} />
+        </div>
+
+        <div className="rounded-2xl bg-zinc-900 border border-zinc-800 px-5 py-4">
+          <TunerBar
+            cents={displayCents}
+            note={displayNote}
+            listening={isListening}
+          />
         </div>
 
         <GuitarHeadstock
