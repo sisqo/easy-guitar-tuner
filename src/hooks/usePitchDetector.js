@@ -1,8 +1,10 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
 import { PitchDetector } from 'pitchy'
 
-const NOISE_GATE_RMS = 0.01
-const CLARITY_THRESHOLD = 0.85
+const NOISE_GATE_RMS = 0.012
+const CLARITY_THRESHOLD = 0.80
+const SMOOTH_FACTOR = 0.25      // EMA weight for new reading (lower = smoother/slower)
+const RESET_THRESHOLD_CENTS = 150  // reset smoothing when pitch jumps this much
 
 export function usePitchDetector() {
   const [isListening, setIsListening] = useState(false)
@@ -16,6 +18,7 @@ export function usePitchDetector() {
   const detectorRef = useRef(null)
   const rafRef = useRef(null)
   const bufferRef = useRef(null)
+  const smoothedPitchRef = useRef(null)
 
   const stop = useCallback(() => {
     if (rafRef.current) {
@@ -34,6 +37,7 @@ export function usePitchDetector() {
       audioCtxRef.current.close()
       audioCtxRef.current = null
     }
+    smoothedPitchRef.current = null
     setIsListening(false)
     setPitch(null)
   }, [])
@@ -41,15 +45,16 @@ export function usePitchDetector() {
   const start = useCallback(async () => {
     setError(null)
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+      })
       const ctx = new AudioContext()
       const analyser = ctx.createAnalyser()
-      analyser.fftSize = 2048
-      analyser.smoothingTimeConstant = 0.1
+      analyser.fftSize = 4096
+      analyser.smoothingTimeConstant = 0.0
 
       const source = ctx.createMediaStreamSource(stream)
       source.connect(analyser)
-
       streamRef.current = stream
 
       const detector = PitchDetector.forFloat32Array(analyser.fftSize)
@@ -73,11 +78,22 @@ export function usePitchDetector() {
         if (rms >= NOISE_GATE_RMS) {
           const [detectedPitch, clarity] = detector.findPitch(buffer, ctx.sampleRate)
           if (clarity >= CLARITY_THRESHOLD && detectedPitch > 50 && detectedPitch < 2000) {
-            setPitch(detectedPitch)
+            const prev = smoothedPitchRef.current
+            if (prev === null) {
+              smoothedPitchRef.current = detectedPitch
+            } else {
+              const jumpCents = Math.abs(1200 * Math.log2(detectedPitch / prev))
+              smoothedPitchRef.current = jumpCents > RESET_THRESHOLD_CENTS
+                ? detectedPitch
+                : prev * (1 - SMOOTH_FACTOR) + detectedPitch * SMOOTH_FACTOR
+            }
+            setPitch(smoothedPitchRef.current)
           } else {
+            smoothedPitchRef.current = null
             setPitch(null)
           }
         } else {
+          smoothedPitchRef.current = null
           setPitch(null)
         }
 

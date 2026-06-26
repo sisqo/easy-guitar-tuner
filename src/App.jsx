@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from 'react'
+import { useMemo, useEffect, useState } from 'react'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { usePitchDetector } from './hooks/usePitchDetector'
 import { useOscillator } from './hooks/useOscillator'
@@ -17,6 +17,7 @@ export default function App() {
   const [instrument, setInstrument] = useLocalStorage('egt-instrument', 'guitar6')
   const [tuningKey, setTuningKey] = useLocalStorage('egt-tuning', 'standard')
   const [diapason, setDiapason] = useLocalStorage('egt-diapason', 440)
+  const [lockedStringId, setLockedStringId] = useState(null)
 
   const { isListening, pitch, error, start, stop } = usePitchDetector()
   const { playNote } = useOscillator()
@@ -27,23 +28,46 @@ export default function App() {
 
   const allTunings = useMemo(() => getTunings(diapason), [diapason])
   const instrumentData = allTunings[instrument]
-
   const safeTuningKey = instrumentData.tunings[tuningKey] ? tuningKey : 'standard'
-  const currentTuning = instrumentData.tunings[safeTuningKey]
-  const strings = currentTuning.strings
+  const strings = instrumentData.tunings[safeTuningKey].strings
 
-  const closest = useMemo(
-    () => findClosestString(pitch, strings),
-    [pitch, strings]
-  )
-
-  const displayNote = closest ? freqToNoteName(pitch, diapason) : null
-  const displayCents = closest ? closest.cents : 0
-
+  // When instrument or tuning changes, clear the lock
   function handleInstrumentChange(id) {
     setInstrument(id)
     setTuningKey('standard')
+    setLockedStringId(null)
   }
+  function handleTuningChange(key) {
+    setTuningKey(key)
+    setLockedStringId(null)
+  }
+
+  function handleLockToggle(stringId) {
+    setLockedStringId(prev => prev === stringId ? null : stringId)
+  }
+
+  // Compute what to display on the tuner bar
+  const { displayNote, displayCents, activeStringId, activeCents } = useMemo(() => {
+    if (lockedStringId !== null) {
+      const locked = strings.find(s => s.id === lockedStringId)
+      const cents = locked && pitch ? getCents(pitch, locked.freq) : null
+      return {
+        displayNote: pitch ? freqToNoteName(pitch, diapason) : null,
+        displayCents: cents ?? 0,
+        activeStringId: lockedStringId,
+        activeCents: cents ?? 0,
+      }
+    }
+    const closest = findClosestString(pitch, strings)
+    return {
+      displayNote: closest ? freqToNoteName(pitch, diapason) : null,
+      displayCents: closest?.cents ?? 0,
+      activeStringId: closest?.id ?? null,
+      activeCents: closest?.cents ?? 0,
+    }
+  }, [lockedStringId, pitch, strings, diapason])
+
+  const lockedString = lockedStringId !== null ? strings.find(s => s.id === lockedStringId) : null
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
@@ -59,7 +83,12 @@ export default function App() {
         <InstrumentTabs active={instrument} onChange={handleInstrumentChange} />
 
         <div className="rounded-2xl bg-zinc-900 border border-zinc-800 p-5 flex flex-col gap-5">
-          <TunerBar cents={displayCents} note={displayNote} listening={isListening} />
+          <TunerBar
+            cents={displayCents}
+            note={displayNote}
+            listening={isListening}
+            lockedString={lockedString}
+          />
           <div className="flex justify-center">
             <MicButton listening={isListening} error={error} onStart={start} onStop={stop} />
           </div>
@@ -69,15 +98,17 @@ export default function App() {
           <TuningSelector
             tunings={instrumentData.tunings}
             active={safeTuningKey}
-            onChange={setTuningKey}
+            onChange={handleTuningChange}
           />
           <DiapasonControl value={diapason} onChange={setDiapason} />
         </div>
 
         <StringGrid
           strings={strings}
-          closestStringId={closest?.id ?? null}
-          closestCents={closest?.cents ?? 0}
+          closestStringId={activeStringId}
+          closestCents={activeCents}
+          lockedStringId={lockedStringId}
+          onLockToggle={handleLockToggle}
           onPlay={playNote}
         />
       </main>
