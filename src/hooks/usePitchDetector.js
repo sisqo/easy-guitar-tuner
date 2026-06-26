@@ -1,10 +1,11 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
 import { PitchDetector } from 'pitchy'
 
-const NOISE_GATE_RMS = 0.012
-const CLARITY_THRESHOLD = 0.80
-const SMOOTH_FACTOR = 0.25      // EMA weight for new reading (lower = smoother/slower)
-const RESET_THRESHOLD_CENTS = 150  // reset smoothing when pitch jumps this much
+const NOISE_GATE_RMS = 0.004
+const CLARITY_THRESHOLD = 0.75
+const SMOOTH_FACTOR = 0.25
+const RESET_THRESHOLD_CENTS = 150
+const HOLD_MS = 1500  // keep last reading visible after signal fades
 
 export function usePitchDetector() {
   const [isListening, setIsListening] = useState(false)
@@ -19,6 +20,7 @@ export function usePitchDetector() {
   const rafRef = useRef(null)
   const bufferRef = useRef(null)
   const smoothedPitchRef = useRef(null)
+  const lastValidAtRef = useRef(null)
 
   const stop = useCallback(() => {
     if (rafRef.current) {
@@ -38,6 +40,7 @@ export function usePitchDetector() {
       audioCtxRef.current = null
     }
     smoothedPitchRef.current = null
+    lastValidAtRef.current = null
     setIsListening(false)
     setPitch(null)
   }, [])
@@ -87,14 +90,25 @@ export function usePitchDetector() {
                 ? detectedPitch
                 : prev * (1 - SMOOTH_FACTOR) + detectedPitch * SMOOTH_FACTOR
             }
+            lastValidAtRef.current = performance.now()
             setPitch(smoothedPitchRef.current)
+          } else {
+            const elapsed = performance.now() - (lastValidAtRef.current ?? 0)
+            if (elapsed < HOLD_MS && smoothedPitchRef.current !== null) {
+              // hold last reading — don't update pitch
+            } else {
+              smoothedPitchRef.current = null
+              setPitch(null)
+            }
+          }
+        } else {
+          const elapsed = performance.now() - (lastValidAtRef.current ?? 0)
+          if (elapsed < HOLD_MS && smoothedPitchRef.current !== null) {
+            // hold last reading during signal decay
           } else {
             smoothedPitchRef.current = null
             setPitch(null)
           }
-        } else {
-          smoothedPitchRef.current = null
-          setPitch(null)
         }
 
         rafRef.current = requestAnimationFrame(loop)
