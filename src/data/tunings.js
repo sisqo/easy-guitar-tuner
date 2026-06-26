@@ -38,7 +38,7 @@ export function getTunings(diapason = 440) {
           ['E',4,'E4'], ['E',4,'E4ʼ'],
         ], diapason) },
         dropD:   { label: 'Drop D 12-string', strings: buildStrings([
-          ['D',2,'D2'], ['D',3,'D3'],
+          ['D',2,'D2'], ['D',3,'D3ˡ'],
           ['A',2,'A2'], ['A',3,'A3'],
           ['D',3,'D3'], ['D',4,'D4'],
           ['G',3,'G3'], ['G',4,'G4'],
