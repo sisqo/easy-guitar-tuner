@@ -27,21 +27,21 @@ export default function TunerBar({ cents, note, listening }) {
   const rawUnit = (cents ?? 0) / 5
   const displayUnit = Math.max(-10, Math.min(10, Math.round(rawUnit)))
 
-  const indicatorColor = !hasSignal ? 'bg-zinc-600'
+  const indicatorColor = !hasSignal ? 'bg-zinc-400 dark:bg-zinc-600'
     : inTune  ? 'bg-emerald-500'
     : isSharp ? 'bg-amber-400'
     : 'bg-sky-400'
 
-  const unitColor = !hasSignal ? 'text-zinc-600'
-    : inTune  ? 'text-emerald-400'
-    : isSharp ? 'text-amber-400'
-    : 'text-sky-400'
+  const unitColor = !hasSignal ? 'text-zinc-400 dark:text-zinc-600'
+    : inTune  ? 'text-emerald-500 dark:text-emerald-400'
+    : isSharp ? 'text-amber-500 dark:text-amber-400'
+    : 'text-sky-500 dark:text-sky-400'
 
   return (
     <div className="flex flex-col gap-2">
       {/* Note name + scaled value */}
       <div className="flex items-end justify-center gap-3">
-        <span className={`text-6xl font-bold tabular-nums transition-colors ${hasSignal ? 'text-zinc-100' : 'text-zinc-700'}`}>
+        <span className={`text-6xl font-bold tabular-nums transition-colors ${hasSignal ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-300 dark:text-zinc-700'}`}>
           {hasSignal ? note : '--'}
         </span>
         {hasSignal && (
@@ -52,7 +52,7 @@ export default function TunerBar({ cents, note, listening }) {
       </div>
 
       {/* Tuner bar */}
-      <div className="relative h-4 rounded-full bg-zinc-800 overflow-hidden">
+      <div className="relative h-4 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
         {/* Green zone ±1 unit (±5 cents) */}
         <div
           className="absolute inset-y-0 bg-emerald-500/20 border-l border-r border-emerald-500/40"
@@ -66,7 +66,7 @@ export default function TunerBar({ cents, note, listening }) {
           return (
             <div
               key={tick}
-              className={`absolute w-0.5 bg-zinc-600 z-10 ${isCenter ? 'h-3 top-[2px]' : 'h-1.5 top-[5px]'}`}
+              className={`absolute w-0.5 bg-zinc-400 dark:bg-zinc-600 z-10 ${isCenter ? 'h-3 top-[2px]' : 'h-1.5 top-[5px]'}`}
               style={{ left: `calc(${pctPos}% - 1px)` }}
             />
           )
@@ -80,9 +80,9 @@ export default function TunerBar({ cents, note, listening }) {
       </div>
 
       {/* Scale labels */}
-      <div className="flex justify-between text-xs text-zinc-600 px-0.5">
+      <div className="flex justify-between text-xs text-zinc-400 dark:text-zinc-600 px-0.5">
         <span className={isFlat ? 'text-sky-500 font-medium' : ''}>−10</span>
-        <span className={`font-semibold ${inTune ? 'text-emerald-500' : 'text-zinc-600'}`}>
+        <span className={`font-semibold ${inTune ? 'text-emerald-500' : ''}`}>
           {inTune ? '✓ IN TUNE' : 'TUNE'}
         </span>
         <span className={isSharp ? 'text-amber-500 font-medium' : ''}>+10</span>

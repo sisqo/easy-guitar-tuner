@@ -120,7 +120,7 @@ export default function GuitarHeadstock({
   const nutY = hs.y + hs.h  // y-coordinate of the top of the nut
 
   return (
-    <div className="rounded-2xl bg-zinc-950 border border-zinc-800 p-2 flex justify-center overflow-hidden">
+    <div className="rounded-2xl bg-zinc-100 border border-zinc-200 dark:bg-zinc-950 dark:border-zinc-800 p-2 flex justify-center overflow-hidden">
       <svg viewBox={viewBox} className="w-full" style={{ maxWidth: 300 }}
            aria-label="Guitar headstock tuner">
         <defs>
