@@ -1,26 +1,22 @@
-const TABS = [
-  { id: 'guitar6',  label: 'Guitar 6' },
-  { id: 'guitar12', label: 'Guitar 12' },
+const INSTRUMENTS = [
+  { id: 'guitar6',  label: 'Guitar 6-string' },
+  { id: 'guitar12', label: 'Guitar 12-string' },
   { id: 'ukulele',  label: 'Ukulele' },
 ]
 
 export default function InstrumentTabs({ active, onChange }) {
   return (
-    <div className="flex gap-1 p-1 rounded-xl bg-zinc-800 dark:bg-zinc-900">
-      {TABS.map(tab => (
-        <button
-          key={tab.id}
-          onClick={() => onChange(tab.id)}
-          className={`
-            flex-1 py-2 px-3 rounded-lg text-sm font-semibold tracking-wide transition-all
-            ${active === tab.id
-              ? 'bg-zinc-100 dark:bg-zinc-100 text-zinc-900'
-              : 'text-zinc-400 hover:text-zinc-200'}
-          `}
-        >
-          {tab.label}
-        </button>
-      ))}
+    <div className="flex flex-col gap-1">
+      <label className="text-xs text-zinc-500 uppercase tracking-widest">Instrument</label>
+      <select
+        value={active}
+        onChange={e => onChange(e.target.value)}
+        className="bg-zinc-800 dark:bg-zinc-900 text-zinc-100 text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500 cursor-pointer"
+      >
+        {INSTRUMENTS.map(inst => (
+          <option key={inst.id} value={inst.id}>{inst.label}</option>
+        ))}
+      </select>
     </div>
   )
 }
