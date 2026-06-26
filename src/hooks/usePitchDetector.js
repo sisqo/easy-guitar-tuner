@@ -12,6 +12,7 @@ export function usePitchDetector() {
   const audioCtxRef = useRef(null)
   const analyserRef = useRef(null)
   const sourceRef = useRef(null)
+  const streamRef = useRef(null)
   const detectorRef = useRef(null)
   const rafRef = useRef(null)
   const bufferRef = useRef(null)
@@ -23,8 +24,11 @@ export function usePitchDetector() {
     }
     if (sourceRef.current) {
       sourceRef.current.disconnect()
-      sourceRef.current.mediaStream?.getTracks().forEach(t => t.stop())
       sourceRef.current = null
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop())
+      streamRef.current = null
     }
     if (audioCtxRef.current) {
       audioCtxRef.current.close()
@@ -44,8 +48,9 @@ export function usePitchDetector() {
       analyser.smoothingTimeConstant = 0.1
 
       const source = ctx.createMediaStreamSource(stream)
-      source.mediaStream = stream
       source.connect(analyser)
+
+      streamRef.current = stream
 
       const detector = PitchDetector.forFloat32Array(analyser.fftSize)
       const buffer = new Float32Array(detector.inputLength)
