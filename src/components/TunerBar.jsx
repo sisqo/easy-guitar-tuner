@@ -2,7 +2,7 @@ import { useRef } from 'react'
 import { isInTune } from '../utils/noteUtils'
 
 const CENTS_RANGE = 50
-const DISPLAY_SMOOTH = 0.2  // EMA for the visual indicator
+const DISPLAY_SMOOTH = 0.12  // EMA for the visual indicator
 const TICKS = [-50, -40, -30, -20, -10, 0, 10, 20, 30, 40, 50]
 
 export default function TunerBar({ cents, note, listening, lockedString }) {

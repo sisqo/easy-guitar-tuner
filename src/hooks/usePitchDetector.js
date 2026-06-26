@@ -3,8 +3,9 @@ import { PitchDetector } from 'pitchy'
 
 const NOISE_GATE_RMS = 0.004
 const CLARITY_THRESHOLD = 0.75
-const SMOOTH_FACTOR = 0.25
-const RESET_THRESHOLD_CENTS = 150
+const SMOOTH_FACTOR = 0.15
+const REJECT_THRESHOLD_CENTS = 30  // outlier: too far from smooth but not a new string
+const RESET_THRESHOLD_CENTS = 100  // large jump: treat as new string
 const HOLD_MS = 1500  // keep last reading visible after signal fades
 
 export function usePitchDetector() {
@@ -86,9 +87,13 @@ export function usePitchDetector() {
               smoothedPitchRef.current = detectedPitch
             } else {
               const jumpCents = Math.abs(1200 * Math.log2(detectedPitch / prev))
-              smoothedPitchRef.current = jumpCents > RESET_THRESHOLD_CENTS
-                ? detectedPitch
-                : prev * (1 - SMOOTH_FACTOR) + detectedPitch * SMOOTH_FACTOR
+              if (jumpCents > RESET_THRESHOLD_CENTS) {
+                smoothedPitchRef.current = detectedPitch  // new string
+              } else if (jumpCents > REJECT_THRESHOLD_CENTS) {
+                // outlier: discard, keep current smooth
+              } else {
+                smoothedPitchRef.current = prev * (1 - SMOOTH_FACTOR) + detectedPitch * SMOOTH_FACTOR
+              }
             }
             lastValidAtRef.current = performance.now()
             setPitch(smoothedPitchRef.current)
