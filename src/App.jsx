@@ -8,16 +8,16 @@ import { findClosestString, freqToNoteName, getCents, isInTune } from './utils/n
 import ThemeToggle from './components/ThemeToggle'
 import InstrumentTabs from './components/InstrumentTabs'
 import TuningSelector from './components/TuningSelector'
-import DiapasonControl from './components/DiapasonControl'
 import TunerBar from './components/TunerBar'
 import GuitarHeadstock from './components/GuitarHeadstock'
 import MicButton from './components/MicButton'
+
+const DIAPASON = 440
 
 export default function App() {
   const [dark, setDark] = useLocalStorage('egt-dark', true)
   const [instrument, setInstrument] = useLocalStorage('egt-instrument', 'guitar6')
   const [tuningKey, setTuningKey] = useLocalStorage('egt-tuning', 'standard')
-  const [diapason, setDiapason] = useLocalStorage('egt-diapason', 440)
   const [lockedStringId, setLockedStringId] = useState(null)
 
   const { isListening, pitch, error, start, stop } = usePitchDetector()
@@ -31,12 +31,11 @@ export default function App() {
     document.documentElement.classList.toggle('dark', dark)
   }, [dark])
 
-  const allTunings = useMemo(() => getTunings(diapason), [diapason])
+  const allTunings = useMemo(() => getTunings(DIAPASON), [])
   const instrumentData = allTunings[instrument]
   const safeTuningKey = instrumentData.tunings[tuningKey] ? tuningKey : 'standard'
   const strings = instrumentData.tunings[safeTuningKey].strings
 
-  // When instrument or tuning changes, clear the lock
   function handleInstrumentChange(id) {
     setInstrument(id)
     setTuningKey('standard')
@@ -46,18 +45,16 @@ export default function App() {
     setTuningKey(key)
     setLockedStringId(null)
   }
-
   function handleLockToggle(stringId) {
     setLockedStringId(prev => prev === stringId ? null : stringId)
   }
 
-  // Compute what to display on the tuner bar
   const { displayNote, displayCents, activeStringId, activeCents } = useMemo(() => {
     if (lockedStringId !== null) {
       const locked = strings.find(s => s.id === lockedStringId)
       const cents = locked && pitch ? getCents(pitch, locked.freq) : null
       return {
-        displayNote: pitch ? freqToNoteName(pitch, diapason) : null,
+        displayNote: pitch ? freqToNoteName(pitch, DIAPASON) : null,
         displayCents: cents ?? 0,
         activeStringId: lockedStringId,
         activeCents: cents ?? 0,
@@ -65,14 +62,13 @@ export default function App() {
     }
     const closest = findClosestString(pitch, strings)
     return {
-      displayNote: closest ? freqToNoteName(pitch, diapason) : null,
+      displayNote: closest ? freqToNoteName(pitch, DIAPASON) : null,
       displayCents: closest?.cents ?? 0,
       activeStringId: closest?.id ?? null,
       activeCents: closest?.cents ?? 0,
     }
-  }, [lockedStringId, pitch, strings, diapason])
+  }, [lockedStringId, pitch, strings])
 
-  // Success beep: fire once when string stays in tune for 1.5 continuous seconds
   useEffect(() => {
     if (isInTune(displayCents, 5) && displayNote) {
       if (inTuneStartRef.current === null) {
@@ -103,15 +99,12 @@ export default function App() {
       <main className="flex-1 flex flex-col gap-4 px-4 py-4 max-w-lg mx-auto w-full">
         <InstrumentTabs active={instrument} onChange={handleInstrumentChange} />
 
-        <div className="rounded-2xl bg-zinc-900 border border-zinc-800 px-4 py-3 flex items-center gap-4">
-          <div className="flex-1">
-            <TunerBar
-              cents={displayCents}
-              note={displayNote}
-              listening={isListening}
-            />
-          </div>
-          <MicButton listening={isListening} error={error} onStart={start} onStop={stop} />
+        <div className="rounded-2xl bg-zinc-900 border border-zinc-800 px-5 py-4">
+          <TunerBar
+            cents={displayCents}
+            note={displayNote}
+            listening={isListening}
+          />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -120,7 +113,12 @@ export default function App() {
             active={safeTuningKey}
             onChange={handleTuningChange}
           />
-          <DiapasonControl value={diapason} onChange={setDiapason} />
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-zinc-500 uppercase tracking-widest">Microphone</label>
+            <div className="flex items-center justify-center bg-zinc-800 border border-zinc-700 rounded-lg py-1.5">
+              <MicButton listening={isListening} error={error} onStart={start} onStop={stop} />
+            </div>
+          </div>
         </div>
 
         <GuitarHeadstock
