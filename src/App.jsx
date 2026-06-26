@@ -86,13 +86,13 @@ export default function App() {
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
       <header className="relative flex items-center justify-center px-4 py-3 border-b border-zinc-800">
-        <div className="flex items-center gap-3">
-          <img src="/logo.png" alt="" className="w-10 h-10 rounded-xl" />
+        <div className="flex items-center gap-4">
+          <img src="/logo.png" alt="" className="w-14 h-14 rounded-2xl" />
           <div>
-            <h1 className="text-lg font-bold tracking-tight text-zinc-100 leading-none">
+            <h1 className="text-2xl font-bold tracking-tight text-zinc-100 leading-none">
               Easy<span style={{ color: '#2aab9e' }}>Guitar</span>Tuner
             </h1>
-            <p className="text-xs text-zinc-500 mt-0.5 tracking-wide">Chromatic tuner</p>
+            <p className="text-xs text-zinc-400 mt-1 tracking-wide">Chromatic tuner</p>
           </div>
         </div>
         <div className="absolute right-4 top-1/2 -translate-y-1/2">
@@ -101,8 +101,11 @@ export default function App() {
       </header>
 
       <main className="flex-1 flex flex-col gap-4 px-4 py-4 max-w-lg mx-auto w-full">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
           <InstrumentTabs active={instrument} onChange={handleInstrumentChange} />
+          <div className="flex items-center justify-center" style={{ paddingBottom: '1px' }}>
+            <MicButton listening={isListening} error={error} onStart={start} onStop={stop} />
+          </div>
           <TuningSelector
             tunings={instrumentData.tunings}
             active={safeTuningKey}
@@ -110,9 +113,6 @@ export default function App() {
           />
         </div>
 
-        <div className="flex justify-center">
-          <MicButton listening={isListening} error={error} onStart={start} onStop={stop} />
-        </div>
 
         <div className="rounded-2xl bg-zinc-900 border border-zinc-800 px-5 py-4">
           <TunerBar
@@ -121,6 +121,7 @@ export default function App() {
             listening={isListening}
           />
         </div>
+
 
         <GuitarHeadstock
           strings={strings}
