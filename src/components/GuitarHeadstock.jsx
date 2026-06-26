@@ -1,298 +1,248 @@
 import { isInTune } from '../utils/noteUtils'
 
-function getLayout(count) {
-  if (count === 4) {
-    // Ukulele: 2 left, 2 right
-    return {
-      viewBox: '0 0 300 380',
-      svgH: 380,
-      headstock: { x: 115, y: 22, width: 70, height: 165, rx: 8 },
-      leftIndices: [0, 1],
-      rightIndices: [2, 3],
-      pegXLeft: 119,
-      pegXRight: 181,
-      pegYs: [72, 140],
-      stringXs: [130, 143, 157, 170],
-      stringWidths: [1.8, 1.4, 1.1, 0.8],
-      buttonR: 22,
-      buttonXLeft: 58,
-      buttonXRight: 242,
-      labelFontSize: 13,
-    }
-  }
-
-  if (count === 12) {
-    // 12-string guitar: 6 left (even indices), 6 right (odd indices)
-    return {
-      viewBox: '0 0 300 460',
-      svgH: 460,
-      headstock: { x: 82, y: 18, width: 136, height: 268, rx: 10 },
-      leftIndices: [0, 2, 4, 6, 8, 10],
-      rightIndices: [1, 3, 5, 7, 9, 11],
-      pegXLeft: 86,
-      pegXRight: 214,
-      pegYs: [48, 90, 132, 174, 216, 258],
-      stringXs: [94, 100, 110, 116, 126, 132, 142, 148, 158, 164, 174, 180],
-      stringWidths: [2.3, 1.8, 1.9, 1.4, 1.5, 1.1, 1.2, 0.9, 0.9, 0.8, 0.8, 0.7],
-      buttonR: 17,
-      buttonXLeft: 38,
-      buttonXRight: 262,
-      labelFontSize: 10,
-    }
-  }
-
-  // 6-string guitar (default): 3 left, 3 right
-  return {
+// Layout definitions per instrument type
+const LAYOUTS = {
+  4: {  // ukulele
+    viewBox: '0 0 300 360',
+    svgH: 360,
+    headstock: { x: 110, y: 28, w: 80, h: 160, rx: 8 },
+    nutH: 9,
+    // string x positions AT the nut (evenly spaced inside headstock inner area)
+    nutXs: [122, 140, 160, 178],
+    // peg positions [{ x, y }] — left side then right side
+    leftPegs:  [{ x: 116, y: 68 }, { x: 116, y: 135 }],
+    rightPegs: [{ x: 184, y: 68 }, { x: 184, y: 135 }],
+    // which string indices go left vs right
+    leftIndices:  [0, 1],
+    rightIndices: [2, 3],
+    pegR: 9,
+    buttonR: 21,
+    leftBtnX: 52,
+    rightBtnX: 248,
+    labelSize: 13,
+    strWidths: [1.6, 1.2, 1.0, 0.7],
+  },
+  6: {  // guitar 6-string
     viewBox: '0 0 300 420',
     svgH: 420,
-    headstock: { x: 92, y: 22, width: 116, height: 218, rx: 10 },
-    leftIndices: [0, 1, 2],
+    headstock: { x: 93, y: 28, w: 114, h: 215, rx: 10 },
+    nutH: 10,
+    nutXs: [107, 123, 139, 161, 177, 193],
+    leftPegs:  [{ x: 100, y: 72 }, { x: 100, y: 135 }, { x: 100, y: 198 }],
+    rightPegs: [{ x: 200, y: 72 }, { x: 200, y: 135 }, { x: 200, y: 198 }],
+    leftIndices:  [0, 1, 2],
     rightIndices: [3, 4, 5],
-    pegXLeft: 96,
-    pegXRight: 204,
-    pegYs: [72, 132, 192],
-    stringXs: [110, 125, 140, 160, 175, 190],
-    stringWidths: [2.5, 2.0, 1.6, 1.3, 1.0, 0.7],
+    pegR: 10,
     buttonR: 22,
-    buttonXLeft: 48,
-    buttonXRight: 252,
-    labelFontSize: 13,
-  }
+    leftBtnX: 44,
+    rightBtnX: 256,
+    labelSize: 13,
+    strWidths: [2.4, 1.9, 1.5, 1.2, 0.9, 0.7],
+  },
+  12: {  // guitar 12-string
+    viewBox: '0 0 300 480',
+    svgH: 480,
+    headstock: { x: 80, y: 22, w: 140, h: 308, rx: 10 },
+    nutH: 10,
+    nutXs: [92, 100, 110, 118, 128, 136, 164, 172, 182, 190, 200, 208],
+    leftPegs:  [
+      { x: 87, y: 55 }, { x: 87, y: 107 }, { x: 87, y: 159 },
+      { x: 87, y: 211 }, { x: 87, y: 263 }, { x: 87, y: 315 },
+    ],
+    rightPegs: [
+      { x: 213, y: 55 }, { x: 213, y: 107 }, { x: 213, y: 159 },
+      { x: 213, y: 211 }, { x: 213, y: 263 }, { x: 213, y: 315 },
+    ],
+    leftIndices:  [0, 2, 4, 6, 8, 10],
+    rightIndices: [1, 3, 5, 7, 9, 11],
+    pegR: 9,
+    buttonR: 17,
+    leftBtnX: 36,
+    rightBtnX: 264,
+    labelSize: 10,
+    strWidths: [2.2, 1.7, 1.8, 1.4, 1.5, 1.1, 1.1, 0.9, 0.9, 0.8, 0.8, 0.7],
+  },
 }
 
-function getPegPos(stringIndex, layout) {
-  const { leftIndices, rightIndices, pegXLeft, pegXRight, pegYs } = layout
-  const li = leftIndices.indexOf(stringIndex)
-  if (li !== -1) return { x: pegXLeft, y: pegYs[li] }
-  const ri = rightIndices.indexOf(stringIndex)
-  if (ri !== -1) return { x: pegXRight, y: pegYs[ri] }
+function getLayout(count) {
+  return LAYOUTS[count] ?? LAYOUTS[6]
+}
+
+function getPeg(stringIndex, layout) {
+  const li = layout.leftIndices.indexOf(stringIndex)
+  if (li !== -1) return { peg: layout.leftPegs[li], side: 'left', sideIdx: li }
+  const ri = layout.rightIndices.indexOf(stringIndex)
+  if (ri !== -1) return { peg: layout.rightPegs[ri], side: 'right', sideIdx: ri }
   return null
 }
 
-function getButtonPos(stringIndex, layout) {
-  const { leftIndices, rightIndices, pegYs, buttonXLeft, buttonXRight } = layout
-  const li = leftIndices.indexOf(stringIndex)
-  if (li !== -1) return { x: buttonXLeft, y: pegYs[li] }
-  const ri = rightIndices.indexOf(stringIndex)
-  if (ri !== -1) return { x: buttonXRight, y: pegYs[ri] }
+function getBtnPos(stringIndex, layout) {
+  const li = layout.leftIndices.indexOf(stringIndex)
+  if (li !== -1) return { x: layout.leftBtnX, y: layout.leftPegs[li].y }
+  const ri = layout.rightIndices.indexOf(stringIndex)
+  if (ri !== -1) return { x: layout.rightBtnX, y: layout.rightPegs[ri].y }
   return null
 }
 
-function getStringColor(s, activeStringId, lockedStringId) {
+function stringPath(strX, nutY, peg, svgH) {
+  const { x: pegX, y: pegY } = peg
+  // Midpoint y for the S-curve control points
+  const midY = (nutY + pegY) / 2
+  return [
+    `M ${strX} ${svgH}`,     // start at bottom of SVG
+    `L ${strX} ${nutY}`,     // straight up to nut
+    `C ${strX} ${midY} ${pegX} ${midY} ${pegX} ${pegY}`, // cubic bezier to peg
+  ].join(' ')
+}
+
+function stringColor(s, activeStringId, lockedStringId) {
   if (s.id === lockedStringId) return '#38bdf8'
-  const isActive = lockedStringId !== null ? s.id === lockedStringId : s.id === activeStringId
-  if (isActive) return '#dddddd'
-  return '#666666'
+  if (lockedStringId === null && s.id === activeStringId) return '#e4e4e7'
+  return '#52525b'
 }
 
-function getButtonColors(s, activeStringId, lockedStringId, activeCents) {
+function buttonStyle(s, activeStringId, lockedStringId, activeCents) {
   const isLocked = s.id === lockedStringId
   const isActive = lockedStringId !== null ? isLocked : s.id === activeStringId
-  const inTune = isActive && isInTune(activeCents, 5)
-
-  if (inTune) return { fill: '#052e16', stroke: '#22c55e', strokeWidth: 2 }
-  if (isLocked) return { fill: '#082f49', stroke: '#0ea5e9', strokeWidth: 2 }
-  if (isActive) return { fill: '#1c1917', stroke: '#d97706', strokeWidth: 2 }
-  return { fill: '#27272a', stroke: '#52525b', strokeWidth: 1.5 }
+  const tuned = isActive && isInTune(activeCents, 5)
+  if (tuned)    return { fill: '#052e16', stroke: '#22c55e', sw: 2.5 }
+  if (isLocked) return { fill: '#082f49', stroke: '#0ea5e9', sw: 2.5 }
+  if (isActive) return { fill: '#1c1917', stroke: '#d97706', sw: 2 }
+  return { fill: '#18181b', stroke: '#3f3f46', sw: 1.5 }
 }
 
 export default function GuitarHeadstock({
-  strings,
-  activeStringId,
-  lockedStringId,
-  activeCents,
-  onStringSelect,
-  onPlay,
+  strings, activeStringId, lockedStringId, activeCents, onStringSelect, onPlay,
 }) {
-  const layout = getLayout(strings.length)
-  const {
-    viewBox, svgH, headstock, stringXs, stringWidths,
-    pegXLeft, pegXRight, buttonR, labelFontSize,
-  } = layout
+  const L = getLayout(strings.length)
+  const { viewBox, svgH, headstock: hs, nutH, nutXs, leftPegs, rightPegs,
+          pegR, buttonR, leftBtnX, rightBtnX, labelSize, strWidths } = L
+  const nutY = hs.y + hs.h  // y-coordinate of the top of the nut
 
   return (
-    <div className="rounded-2xl bg-zinc-950 border border-zinc-800 p-2 flex justify-center">
-      <svg
-        viewBox={viewBox}
-        className="w-full"
-        style={{ maxWidth: '300px', maxHeight: '460px' }}
-        aria-label="Guitar headstock string selector"
-      >
+    <div className="rounded-2xl bg-zinc-950 border border-zinc-800 p-2 flex justify-center overflow-hidden">
+      <svg viewBox={viewBox} className="w-full" style={{ maxWidth: 300 }}
+           aria-label="Guitar headstock tuner">
         <defs>
-          {/* Dot grid background */}
-          <pattern id="hs-dotgrid" width="15" height="15" patternUnits="userSpaceOnUse">
-            <circle cx="7.5" cy="7.5" r="0.8" fill="#222222" />
+          {/* Dot-grid background */}
+          <pattern id="dotgrid" width="14" height="14" patternUnits="userSpaceOnUse">
+            <circle cx="7" cy="7" r="0.7" fill="#27272a" />
           </pattern>
 
-          {/* Metallic headstock gradient */}
-          <linearGradient id="hs-metal" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%"   stopColor="#181818" />
-            <stop offset="25%"  stopColor="#2a2a2a" />
-            <stop offset="50%"  stopColor="#383838" />
-            <stop offset="75%"  stopColor="#2a2a2a" />
-            <stop offset="100%" stopColor="#181818" />
+          {/* Dark metallic headstock — left-to-right gradient */}
+          <linearGradient id="metal-h" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%"   stopColor="#0f0f0f" />
+            <stop offset="30%"  stopColor="#242424" />
+            <stop offset="50%"  stopColor="#323232" />
+            <stop offset="70%"  stopColor="#242424" />
+            <stop offset="100%" stopColor="#0f0f0f" />
           </linearGradient>
 
-          {/* Top shine on headstock */}
-          <linearGradient id="hs-shine" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%"   stopColor="rgba(255,255,255,0.07)" />
-            <stop offset="40%"  stopColor="rgba(255,255,255,0.02)" />
+          {/* Top-to-bottom shine */}
+          <linearGradient id="metal-shine" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%"   stopColor="rgba(255,255,255,0.09)" />
+            <stop offset="35%"  stopColor="rgba(255,255,255,0.02)" />
             <stop offset="100%" stopColor="rgba(0,0,0,0)" />
           </linearGradient>
 
-          {/* Peg radial gradient */}
-          <radialGradient id="hs-peg" cx="38%" cy="32%" r="65%">
-            <stop offset="0%"   stopColor="#777777" />
-            <stop offset="100%" stopColor="#303030" />
+          {/* Nut gradient */}
+          <linearGradient id="nut-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%"   stopColor="#555" />
+            <stop offset="100%" stopColor="#222" />
+          </linearGradient>
+
+          {/* Tuning peg radial */}
+          <radialGradient id="peg-grad" cx="35%" cy="30%" r="65%">
+            <stop offset="0%"   stopColor="#888" />
+            <stop offset="100%" stopColor="#2a2a2a" />
           </radialGradient>
 
           {/* Active string glow */}
-          <filter id="hs-glow" x="-80%" y="-20%" width="260%" height="140%">
-            <feGaussianBlur stdDeviation="1.8" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
+          <filter id="glow" x="-100%" y="-10%" width="300%" height="120%">
+            <feGaussianBlur stdDeviation="1.5" result="blur" />
+            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
           </filter>
 
-          {/* Button shadow */}
-          <filter id="hs-btnshadow" x="-30%" y="-30%" width="160%" height="160%">
-            <feDropShadow dx="0" dy="1" stdDeviation="2" floodColor="#000" floodOpacity="0.6" />
+          {/* Button drop shadow */}
+          <filter id="btn-shadow" x="-25%" y="-25%" width="150%" height="150%">
+            <feDropShadow dx="0" dy="2" stdDeviation="2.5" floodColor="#000" floodOpacity="0.7" />
           </filter>
         </defs>
 
-        {/* SVG background */}
+        {/* Background */}
         <rect width="300" height={svgH} fill="#09090b" />
-        <rect width="300" height={svgH} fill="url(#hs-dotgrid)" />
+        <rect width="300" height={svgH} fill="url(#dotgrid)" />
 
         {/* Headstock body */}
-        <rect
-          x={headstock.x}
-          y={headstock.y}
-          width={headstock.width}
-          height={headstock.height}
-          rx={headstock.rx}
-          fill="url(#hs-metal)"
-          stroke="#444444"
-          strokeWidth="1.5"
-        />
+        <rect x={hs.x} y={hs.y} width={hs.w} height={hs.h} rx={hs.rx}
+              fill="url(#metal-h)" stroke="#3a3a3a" strokeWidth="1.5" />
         {/* Shine overlay */}
-        <rect
-          x={headstock.x + 3}
-          y={headstock.y + 2}
-          width={headstock.width - 6}
-          height={Math.min(60, headstock.height * 0.3)}
-          rx={headstock.rx - 2}
-          fill="url(#hs-shine)"
-        />
+        <rect x={hs.x + 3} y={hs.y + 2} width={hs.w - 6}
+              height={Math.min(55, hs.h * 0.28)} rx={hs.rx - 2}
+              fill="url(#metal-shine)" />
 
-        {/* Nut (bottom edge of headstock) */}
-        <rect
-          x={headstock.x - 2}
-          y={headstock.y + headstock.height - 8}
-          width={headstock.width + 4}
-          height={8}
-          rx={2}
-          fill="#1a1a1a"
-          stroke="#555555"
-          strokeWidth="1"
-        />
+        {/* Nut — the horizontal bone at the bottom of the headstock */}
+        <rect x={hs.x - 1} y={nutY} width={hs.w + 2} height={nutH}
+              rx={2} fill="url(#nut-grad)" stroke="#555" strokeWidth="1" />
+        {/* Nut string slots */}
+        {nutXs.map((nx, i) => (
+          <line key={`slot-${i}`}
+            x1={nx} y1={nutY + 1} x2={nx} y2={nutY + nutH - 1}
+            stroke="#000" strokeWidth={strWidths[i] ?? 1} />
+        ))}
 
-        {/* Strings — drawn before pegs so pegs sit on top */}
+        {/* Strings — drawn BEFORE pegs */}
         {strings.map((s, i) => {
-          const peg = getPegPos(i, layout)
-          if (!peg) return null
+          const res = getPeg(i, L)
+          if (!res) return null
           const isActive = lockedStringId !== null ? s.id === lockedStringId : s.id === activeStringId
-          const isLocked = s.id === lockedStringId
-          const color = getStringColor(s, activeStringId, lockedStringId)
-          const sw = stringWidths[i] ?? 1.0
-          const useGlow = isActive || isLocked
-
+          const d = stringPath(nutXs[i], nutY, res.peg, svgH)
+          const color = stringColor(s, activeStringId, lockedStringId)
+          const sw = strWidths[i] ?? 1
           return (
-            <g key={`string-${s.id}`}>
-              {/* Vertical segment: bottom of SVG to peg level */}
-              <line
-                x1={stringXs[i]} y1={svgH}
-                x2={stringXs[i]} y2={peg.y}
-                stroke={color}
-                strokeWidth={sw}
-                filter={useGlow ? 'url(#hs-glow)' : undefined}
-              />
-              {/* Horizontal segment: string x to peg x (inside headstock) */}
-              <line
-                x1={stringXs[i]} y1={peg.y}
-                x2={peg.x}        y2={peg.y}
-                stroke={color}
-                strokeWidth={sw}
-              />
-            </g>
+            <path key={`str-${s.id}`}
+              d={d}
+              fill="none"
+              stroke={color}
+              strokeWidth={sw}
+              filter={isActive ? 'url(#glow)' : undefined}
+            />
           )
         })}
 
-        {/* Tuning pegs */}
-        {strings.map((s, i) => {
-          const peg = getPegPos(i, layout)
-          if (!peg) return null
-          // Only render one peg per unique position (avoid duplicates for paired strings)
-          const isLeft = layout.leftIndices.includes(i)
-          const x = isLeft ? pegXLeft : pegXRight
-          return (
-            <g key={`peg-${s.id}`}>
-              <circle cx={x} cy={peg.y} r={10} fill="url(#hs-peg)" stroke="#606060" strokeWidth="1" />
-              <circle cx={x} cy={peg.y} r={4.5} fill="#909090" stroke="#a0a0a0" strokeWidth="0.5" />
-            </g>
-          )
-        })}
+        {/* Tuning pegs — drawn AFTER strings */}
+        {[...leftPegs.map(p => ({ ...p, side: 'left' })),
+          ...rightPegs.map(p => ({ ...p, side: 'right' }))].map((p, i) => (
+          <g key={`peg-${i}`}>
+            <circle cx={p.x} cy={p.y} r={pegR}
+                    fill="url(#peg-grad)" stroke="#555" strokeWidth="1" />
+            <circle cx={p.x} cy={p.y} r={pegR * 0.42}
+                    fill="#999" stroke="#aaa" strokeWidth="0.5" />
+          </g>
+        ))}
 
-        {/* String note buttons */}
+        {/* Note buttons */}
         {strings.map((s, i) => {
-          const btn = getButtonPos(i, layout)
+          const btn = getBtnPos(i, L)
           if (!btn) return null
-          const { fill, stroke, strokeWidth } = getButtonColors(s, activeStringId, lockedStringId, activeCents)
-          const r = buttonR
-
+          const { fill, stroke, sw: bsw } = buttonStyle(s, activeStringId, lockedStringId, activeCents)
           return (
-            <g
-              key={`btn-${s.id}`}
-              onClick={() => onStringSelect(s.id)}
-              style={{ cursor: 'pointer' }}
-              filter="url(#hs-btnshadow)"
-            >
-              {/* Button circle */}
-              <circle
-                cx={btn.x}
-                cy={btn.y}
-                r={r}
-                fill={fill}
-                stroke={stroke}
-                strokeWidth={strokeWidth}
-              />
-              {/* Note label */}
-              <text
-                x={btn.x}
-                y={btn.y - 3}
-                textAnchor="middle"
-                dominantBaseline="middle"
-                fontSize={labelFontSize}
-                fill="white"
-                fontFamily="monospace"
-                fontWeight="bold"
-                style={{ userSelect: 'none', pointerEvents: 'none' }}
-              >
+            <g key={`btn-${s.id}`} style={{ cursor: 'pointer' }} filter="url(#btn-shadow)"
+               onClick={() => onStringSelect(s.id)}>
+              <circle cx={btn.x} cy={btn.y} r={buttonR}
+                      fill={fill} stroke={stroke} strokeWidth={bsw} />
+              <text x={btn.x} y={btn.y - (buttonR >= 20 ? 4 : 3)}
+                    textAnchor="middle" dominantBaseline="middle"
+                    fontSize={labelSize} fill="white"
+                    fontFamily="'JetBrains Mono', monospace" fontWeight="700"
+                    style={{ userSelect: 'none', pointerEvents: 'none' }}>
                 {s.label}
               </text>
-              {/* Play icon — separate click target */}
-              <text
-                x={btn.x}
-                y={btn.y + (r >= 20 ? 9 : 7)}
-                textAnchor="middle"
-                dominantBaseline="middle"
-                fontSize={8}
-                fill="#888888"
-                fontFamily="monospace"
-                style={{ userSelect: 'none' }}
-                onClick={(e) => { e.stopPropagation(); onPlay(s.freq) }}
-              >
+              <text x={btn.x} y={btn.y + (buttonR >= 20 ? 10 : 7)}
+                    textAnchor="middle" dominantBaseline="middle"
+                    fontSize={8} fill="#71717a" fontFamily="monospace"
+                    style={{ userSelect: 'none' }}
+                    onClick={e => { e.stopPropagation(); onPlay(s.freq) }}>
                 ▶
               </text>
             </g>

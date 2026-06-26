@@ -74,7 +74,7 @@ export default function App() {
 
   // Success beep: fire once when string stays in tune for 1.5 continuous seconds
   useEffect(() => {
-    if (isInTune(displayCents, 3) && displayNote) {
+    if (isInTune(displayCents, 5) && displayNote) {
       if (inTuneStartRef.current === null) {
         inTuneStartRef.current = Date.now()
       } else if (Date.now() - inTuneStartRef.current >= 1500 && !beepFiredRef.current) {

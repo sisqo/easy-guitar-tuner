@@ -18,7 +18,7 @@ export default function TunerBar({ cents, note, listening, lockedString }) {
 
   const clampedCents = Math.max(-CENTS_RANGE, Math.min(CENTS_RANGE, displayCents))
   const pct = ((clampedCents + CENTS_RANGE) / (CENTS_RANGE * 2)) * 100
-  const inTune = note && isInTune(cents ?? 0, 3)
+  const inTune = note && isInTune(cents ?? 0, 5)
   const hasSignal = note !== null && note !== undefined
 
   const indicatorColor = !hasSignal
@@ -61,7 +61,7 @@ export default function TunerBar({ cents, note, listening, lockedString }) {
         {/* Green zone: ±5 cents wide */}
         <div
           className="absolute inset-y-0 bg-emerald-500/20 border-l border-r border-emerald-500/40"
-          style={{ left: '45%', width: '10%' }}
+          style={{ left: '43%', width: '14%' }}
         />
 
         {/* Tick marks */}
