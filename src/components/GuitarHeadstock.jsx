@@ -131,23 +131,34 @@ export default function GuitarHeadstock({
             <circle cx="7" cy="7" r="0.7" fill={dotColor} />
           </pattern>
 
-          <linearGradient id="metal-h" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%"   stopColor="#0f0f0f" />
-            <stop offset="30%"  stopColor="#242424" />
-            <stop offset="50%"  stopColor="#323232" />
-            <stop offset="70%"  stopColor="#242424" />
-            <stop offset="100%" stopColor="#0f0f0f" />
+          {/* Wood grain lines — near-vertical, subtle */}
+          <pattern id="woodgrain" width="7" height="120" patternUnits="userSpaceOnUse" patternTransform="rotate(1.5)">
+            <line x1="0"   y1="0" x2="0"   y2="120" stroke="rgba(0,0,0,0.06)"       strokeWidth="0.9" />
+            <line x1="3.5" y1="0" x2="3.5" y2="120" stroke="rgba(255,210,140,0.07)" strokeWidth="0.5" />
+          </pattern>
+
+          {/* Maple headstock — warm honey gradient left-to-right */}
+          <linearGradient id="wood-h" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%"   stopColor="#7a4e18" />
+            <stop offset="18%"  stopColor="#b8822c" />
+            <stop offset="40%"  stopColor="#d4a040" />
+            <stop offset="55%"  stopColor="#c99238" />
+            <stop offset="78%"  stopColor="#b07828" />
+            <stop offset="100%" stopColor="#7a4e18" />
           </linearGradient>
 
-          <linearGradient id="metal-shine" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%"   stopColor="rgba(255,255,255,0.09)" />
-            <stop offset="35%"  stopColor="rgba(255,255,255,0.02)" />
+          {/* Gloss varnish — top highlight + subtle horizontal sheen */}
+          <linearGradient id="wood-shine" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%"   stopColor="rgba(255,255,255,0.30)" />
+            <stop offset="12%"  stopColor="rgba(255,255,255,0.10)" />
+            <stop offset="40%"  stopColor="rgba(255,255,255,0.03)" />
             <stop offset="100%" stopColor="rgba(0,0,0,0)" />
           </linearGradient>
 
+          {/* Bone / ivory nut */}
           <linearGradient id="nut-grad" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%"   stopColor="#555" />
-            <stop offset="100%" stopColor="#222" />
+            <stop offset="0%"   stopColor="#ddd0b0" />
+            <stop offset="100%" stopColor="#b8a882" />
           </linearGradient>
 
           <radialGradient id="peg-grad" cx="35%" cy="30%" r="65%">
@@ -169,20 +180,22 @@ export default function GuitarHeadstock({
         <rect width="300" height={svgH} fill={bgColor} />
         <rect width="300" height={svgH} fill="url(#dotgrid)" />
 
-        {/* Headstock body */}
+        {/* Headstock body — maple wood */}
         <rect x={hs.x} y={hs.y} width={hs.w} height={hs.h} rx={hs.rx}
-              fill="url(#metal-h)" stroke="#3a3a3a" strokeWidth="1.5" />
-        <rect x={hs.x + 3} y={hs.y + 2} width={hs.w - 6}
-              height={Math.min(55, hs.h * 0.28)} rx={hs.rx - 2}
-              fill="url(#metal-shine)" />
+              fill="url(#wood-h)" stroke="#5a3510" strokeWidth="1.5" />
+        <rect x={hs.x} y={hs.y} width={hs.w} height={hs.h} rx={hs.rx}
+              fill="url(#woodgrain)" />
+        <rect x={hs.x + 2} y={hs.y + 1} width={hs.w - 4}
+              height={Math.min(60, hs.h * 0.32)} rx={hs.rx - 2}
+              fill="url(#wood-shine)" />
 
-        {/* Nut */}
+        {/* Nut — bone/ivory */}
         <rect x={hs.x - 1} y={nutY} width={hs.w + 2} height={nutH}
-              rx={2} fill="url(#nut-grad)" stroke="#555" strokeWidth="1" />
+              rx={2} fill="url(#nut-grad)" stroke="#9a8060" strokeWidth="1" />
         {nutXs.map((nx, i) => (
           <line key={`slot-${i}`}
             x1={nx} y1={nutY + 1} x2={nx} y2={nutY + nutH - 1}
-            stroke="#000" strokeWidth={strWidths[i] ?? 1} />
+            stroke="#6a5030" strokeWidth={strWidths[i] ?? 1} />
         ))}
 
         {/* Strings */}
