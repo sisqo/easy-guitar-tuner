@@ -1,14 +1,37 @@
 import { useState } from 'react'
 import { SETTINGS_DEFAULTS } from '../hooks/useSettings'
 
-function Slider({ label, description, settingKey, value, min, max, step, format, update }) {
+function InfoBox({ text }) {
+  return (
+    <div className="text-xs text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800/80 rounded-lg px-3 py-2 leading-relaxed border border-zinc-100 dark:border-zinc-700/60">
+      {text}
+    </div>
+  )
+}
+
+function Slider({ label, description, info, settingKey, value, min, max, step, format, update }) {
+  const [showInfo, setShowInfo] = useState(false)
   const isDefault = value === SETTINGS_DEFAULTS[settingKey]
   const display = format ? format(value) : value
 
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="flex items-baseline justify-between">
-        <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">{label}</span>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">{label}</span>
+          {info && (
+            <button
+              onClick={() => setShowInfo(v => !v)}
+              aria-label={`Info: ${label}`}
+              aria-expanded={showInfo}
+              className={`w-[18px] h-[18px] rounded-full flex items-center justify-center border transition-colors text-[10px] font-bold leading-none shrink-0 ${
+                showInfo
+                  ? 'bg-[#2aab9e]/10 border-[#2aab9e] text-[#2aab9e]'
+                  : 'border-zinc-300 dark:border-zinc-600 text-zinc-400 dark:text-zinc-500 hover:border-[#2aab9e] hover:text-[#2aab9e]'
+              }`}
+            >i</button>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <span className="text-sm font-mono tabular-nums text-[#2aab9e]">{display}</span>
           {!isDefault && (
@@ -20,6 +43,7 @@ function Slider({ label, description, settingKey, value, min, max, step, format,
           )}
         </div>
       </div>
+      {showInfo && <InfoBox text={info} />}
       <input
         type="range"
         min={min} max={max} step={step}
@@ -69,6 +93,7 @@ export default function SettingsPanel({ open, onClose, settings, update, resetAl
               value={settings.diapason} min={432} max={446} step={1}
               format={v => `${v} Hz`}
               description="Standard A4"
+              info="Sets the A4 frequency all note targets are calculated from. Standard concert pitch is 440 Hz. Lower values (e.g. 432 Hz) are used for alternative tuning standards."
               update={update}
             />
           </section>
@@ -81,6 +106,7 @@ export default function SettingsPanel({ open, onClose, settings, update, resetAl
               value={settings.inTuneThreshold} min={1} max={15} step={1}
               format={v => `±${v} ¢`}
               description="Green zone width"
+              info="How many cents off-centre a string can be and still count as in tune. A wider zone is easier to hit; a narrower zone requires more precision."
               update={update}
             />
             <Slider
@@ -88,6 +114,7 @@ export default function SettingsPanel({ open, onClose, settings, update, resetAl
               value={settings.displaySmooth} min={0.05} max={0.40} step={0.01}
               format={v => v.toFixed(2)}
               description="Needle fluidity"
+              info="Controls how fluidly the needle moves. Lower values react faster but may feel jittery; higher values are smoother but slower to follow pitch changes."
               update={update}
             />
           </section>
@@ -108,6 +135,7 @@ export default function SettingsPanel({ open, onClose, settings, update, resetAl
                 value={settings.noiseGate} min={0.001} max={0.02} step={0.001}
                 format={v => v.toFixed(3)}
                 description="Min RMS"
+                info="Minimum signal level required before pitch detection activates. Raise it if the tuner picks up ambient noise; lower it if notes are cut off too early during quiet playing."
                 update={update}
               />
               <Slider
@@ -115,6 +143,7 @@ export default function SettingsPanel({ open, onClose, settings, update, resetAl
                 value={settings.clarityThreshold} min={0.70} max={0.98} step={0.01}
                 format={v => v.toFixed(2)}
                 description="McLeod confidence"
+                info="Confidence level required from the pitch detector before accepting a reading. Higher values give fewer false positives but may drop quiet or complex notes."
                 update={update}
               />
               <Slider
@@ -122,6 +151,7 @@ export default function SettingsPanel({ open, onClose, settings, update, resetAl
                 value={settings.smoothFactor} min={0.05} max={0.50} step={0.01}
                 format={v => v.toFixed(2)}
                 description="Pitch reactivity"
+                info="Smoothing applied to the raw pitch signal between frames. Lower = faster and more reactive; higher = smoother but slower to follow rapid pitch changes."
                 update={update}
               />
               <Slider
@@ -129,6 +159,7 @@ export default function SettingsPanel({ open, onClose, settings, update, resetAl
                 value={settings.holdMs} min={200} max={3000} step={100}
                 format={v => `${v} ms`}
                 description="After silence"
+                info="How long the last detected note is displayed after the signal goes quiet. Longer values prevent the reading from disappearing during natural string decay."
                 update={update}
               />
               <Slider
@@ -136,6 +167,7 @@ export default function SettingsPanel({ open, onClose, settings, update, resetAl
                 value={settings.rejectThreshold} min={10} max={80} step={5}
                 format={v => `${v} ¢`}
                 description="Discard small jumps"
+                info="Pitch jumps larger than this value between consecutive frames are discarded as noise. Helps reject string buzz, fret rattle, and sudden detection spikes."
                 update={update}
               />
               <Slider
@@ -143,6 +175,7 @@ export default function SettingsPanel({ open, onClose, settings, update, resetAl
                 value={settings.resetThreshold} min={50} max={200} step={10}
                 format={v => `${v} ¢`}
                 description="New string threshold"
+                info="When the detected pitch jumps by more than this amount, the tuner switches to tracking a new string. Lower = switches strings faster; higher = stays on one string longer."
                 update={update}
               />
             </section>
