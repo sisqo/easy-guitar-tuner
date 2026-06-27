@@ -98,8 +98,8 @@ function isSameFreq(a, b) {
 function stringColor(s, activeStringId, lockedStringId, dark, activeFreq) {
   if (s.id === lockedStringId) return '#38bdf8'
   if (lockedStringId === null && (s.id === activeStringId || isSameFreq(s.freq, activeFreq)))
-    return dark ? '#e4e4e7' : '#3f3f46'
-  return dark ? '#52525b' : '#a1a1aa'
+    return dark ? '#ffffff' : '#1f2937'
+  return dark ? '#c4c9d1' : '#7c7c86' // resting steel string
 }
 
 function buttonStyle(s, activeStringId, lockedStringId, activeCents, dark, inTuneThreshold, tunedStrings, activeFreq) {
@@ -136,40 +136,75 @@ export default function GuitarHeadstock({
             <circle cx="7" cy="7" r="0.7" fill={dotColor} />
           </pattern>
 
-          {/* Wood grain lines — near-vertical, subtle */}
-          <pattern id="woodgrain" width="7" height="120" patternUnits="userSpaceOnUse" patternTransform="rotate(1.5)">
-            <line x1="0"   y1="0" x2="0"   y2="120" stroke="rgba(0,0,0,0.06)"       strokeWidth="0.9" />
-            <line x1="3.5" y1="0" x2="3.5" y2="120" stroke="rgba(255,210,140,0.07)" strokeWidth="0.5" />
-          </pattern>
-
-          {/* Maple headstock — dark: warm honey; light: bleached natural maple */}
+          {/* Maple headstock — dark: softened honey; light: bleached natural maple */}
           <linearGradient id="wood-h" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%"   stopColor={dark ? "#7a4e18" : "#e2d4bc"} />
-            <stop offset="18%"  stopColor={dark ? "#b8822c" : "#f0e6d3"} />
-            <stop offset="40%"  stopColor={dark ? "#d4a040" : "#f8f3ea"} />
-            <stop offset="55%"  stopColor={dark ? "#c99238" : "#f4eedf"} />
-            <stop offset="78%"  stopColor={dark ? "#b07828" : "#ede4cf"} />
-            <stop offset="100%" stopColor={dark ? "#7a4e18" : "#e2d4bc"} />
+            <stop offset="0%"   stopColor={dark ? "#5e3f1c" : "#ddcfb4"} />
+            <stop offset="14%"  stopColor={dark ? "#8a6128" : "#ece0cb"} />
+            <stop offset="38%"  stopColor={dark ? "#c0954c" : "#f7f1e6"} />
+            <stop offset="52%"  stopColor={dark ? "#caa055" : "#f9f4ea"} />
+            <stop offset="70%"  stopColor={dark ? "#ad7c39" : "#f0e7d5"} />
+            <stop offset="100%" stopColor={dark ? "#5e3f1c" : "#ddcfb4"} />
           </linearGradient>
 
-          {/* Gloss varnish — top highlight + subtle horizontal sheen */}
+          {/* Flamed-maple figure — faint horizontal bands across the grain */}
+          <pattern id="woodfigure" width="120" height="13" patternUnits="userSpaceOnUse" patternTransform="rotate(-1.2)">
+            <rect width="120" height="5"   y="0"   fill={dark ? "rgba(55,33,8,0.18)"     : "rgba(150,120,70,0.10)"} />
+            <rect width="120" height="1.4" y="6.4" fill={dark ? "rgba(255,224,160,0.07)" : "rgba(255,255,255,0.28)"} />
+          </pattern>
+
+          {/* Fine vertical grain */}
+          <pattern id="woodgrain" width="6" height="120" patternUnits="userSpaceOnUse" patternTransform="rotate(1.2)">
+            <line x1="0" y1="0" x2="0" y2="120" stroke={dark ? "rgba(0,0,0,0.07)" : "rgba(120,95,50,0.06)"} strokeWidth="0.8" />
+            <line x1="3" y1="0" x2="3" y2="120" stroke={dark ? "rgba(255,220,150,0.06)" : "rgba(255,255,255,0.18)"} strokeWidth="0.5" />
+          </pattern>
+
+          {/* Gloss varnish — top sheen */}
           <linearGradient id="wood-shine" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%"   stopColor="rgba(255,255,255,0.30)" />
-            <stop offset="12%"  stopColor="rgba(255,255,255,0.10)" />
-            <stop offset="40%"  stopColor="rgba(255,255,255,0.03)" />
+            <stop offset="0%"   stopColor="rgba(255,255,255,0.34)" />
+            <stop offset="10%"  stopColor="rgba(255,255,255,0.12)" />
+            <stop offset="38%"  stopColor="rgba(255,255,255,0.03)" />
             <stop offset="100%" stopColor="rgba(0,0,0,0)" />
+          </linearGradient>
+
+          {/* Inner edge shadow — gives the wood block rounded depth */}
+          <linearGradient id="wood-edge" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%"   stopColor="rgba(0,0,0,0.30)" />
+            <stop offset="7%"   stopColor="rgba(0,0,0,0)" />
+            <stop offset="93%"  stopColor="rgba(0,0,0,0)" />
+            <stop offset="100%" stopColor="rgba(0,0,0,0.32)" />
           </linearGradient>
 
           {/* Bone / ivory nut */}
           <linearGradient id="nut-grad" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%"   stopColor="#ddd0b0" />
-            <stop offset="100%" stopColor="#b8a882" />
+            <stop offset="0%"   stopColor="#efe6cf" />
+            <stop offset="45%"  stopColor="#ddd0b0" />
+            <stop offset="100%" stopColor="#b09972" />
           </linearGradient>
 
-          <radialGradient id="peg-grad" cx="35%" cy="30%" r="65%">
-            <stop offset="0%"   stopColor="#888" />
-            <stop offset="100%" stopColor="#2a2a2a" />
+          {/* Nickel tuning machine */}
+          <radialGradient id="peg-metal" cx="34%" cy="28%" r="74%">
+            <stop offset="0%"   stopColor="#f5f6f8" />
+            <stop offset="30%"  stopColor="#c6cad1" />
+            <stop offset="66%"  stopColor="#80858f" />
+            <stop offset="100%" stopColor="#3a3d43" />
           </radialGradient>
+          <radialGradient id="peg-center" cx="38%" cy="32%" r="72%">
+            <stop offset="0%"   stopColor="#eaecef" />
+            <stop offset="100%" stopColor="#686c73" />
+          </radialGradient>
+
+          {/* Glossy sheen layered over each string button */}
+          <linearGradient id="btn-sheen" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%"   stopColor="rgba(255,255,255,0.16)" />
+            <stop offset="45%"  stopColor="rgba(255,255,255,0.02)" />
+            <stop offset="100%" stopColor="rgba(0,0,0,0.18)" />
+          </linearGradient>
+
+          {/* Strings dissolve into the neck at the bottom */}
+          <linearGradient id="string-fade" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%"   stopColor={bgColor} stopOpacity="0" />
+            <stop offset="100%" stopColor={bgColor} stopOpacity="1" />
+          </linearGradient>
 
           <filter id="glow" x="-100%" y="-10%" width="300%" height="120%">
             <feGaussianBlur stdDeviation="1.5" result="blur" />
@@ -179,54 +214,74 @@ export default function GuitarHeadstock({
           <filter id="btn-shadow" x="-25%" y="-25%" width="150%" height="150%">
             <feDropShadow dx="0" dy="2" stdDeviation="2.5" floodColor="#000" floodOpacity={dark ? 0.7 : 0.15} />
           </filter>
+
+          <filter id="peg-shadow" x="-60%" y="-60%" width="220%" height="220%">
+            <feDropShadow dx="0" dy="1.5" stdDeviation="1.3" floodColor="#000" floodOpacity="0.45" />
+          </filter>
         </defs>
 
         {/* Background */}
         <rect width="300" height={svgH} fill={bgColor} />
         <rect width="300" height={svgH} fill="url(#dotgrid)" />
 
-        {/* Headstock body — maple wood */}
+        {/* Headstock body — layered maple wood */}
         <rect x={hs.x} y={hs.y} width={hs.w} height={hs.h} rx={hs.rx}
-              fill="url(#wood-h)" stroke={dark ? "#5a3510" : "#c8b89a"} strokeWidth="1.5" />
-        <rect x={hs.x} y={hs.y} width={hs.w} height={hs.h} rx={hs.rx}
-              fill="url(#woodgrain)" />
+              fill="url(#wood-h)" stroke={dark ? "#3f2a10" : "#cbbd9f"} strokeWidth="1.5" />
+        <rect x={hs.x} y={hs.y} width={hs.w} height={hs.h} rx={hs.rx} fill="url(#woodfigure)" />
+        <rect x={hs.x} y={hs.y} width={hs.w} height={hs.h} rx={hs.rx} fill="url(#woodgrain)" />
+        <rect x={hs.x} y={hs.y} width={hs.w} height={hs.h} rx={hs.rx} fill="url(#wood-edge)" />
         <rect x={hs.x + 2} y={hs.y + 1} width={hs.w - 4}
               height={Math.min(60, hs.h * 0.32)} rx={hs.rx - 2}
               fill="url(#wood-shine)" />
+        {/* Top bevel highlight */}
+        <rect x={hs.x + 2} y={hs.y + 1.5} width={hs.w - 4} height="1.5" rx="0.75"
+              fill="rgba(255,255,255,0.4)" />
 
-        {/* Nut — bone/ivory */}
+        {/* Nut — bone/ivory with string slots */}
         <rect x={hs.x - 1} y={nutY} width={hs.w + 2} height={nutH}
               rx={2} fill="url(#nut-grad)" stroke="#9a8060" strokeWidth="1" />
+        <rect x={hs.x - 1} y={nutY} width={hs.w + 2} height="1.4" rx="0.7" fill="rgba(255,255,255,0.45)" />
         {nutXs.map((nx, i) => (
           <line key={`slot-${i}`}
             x1={nx} y1={nutY + 1} x2={nx} y2={nutY + nutH - 1}
             stroke="#6a5030" strokeWidth={strWidths[i] ?? 1} />
         ))}
 
-        {/* Strings */}
+        {/* Strings — steel with cast shadow + specular highlight */}
         {strings.map((s, i) => {
           const res = getPeg(i, L)
           if (!res) return null
-          const isActive = lockedStringId !== null ? s.id === lockedStringId : s.id === activeStringId
+          const isActive = lockedStringId !== null
+            ? s.id === lockedStringId
+            : (s.id === activeStringId || isSameFreq(s.freq, activeFreq))
           const d = stringPath(nutXs[i], nutY, res.peg, svgH)
           const color = stringColor(s, activeStringId, lockedStringId, dark, activeFreq)
           const sw = strWidths[i] ?? 1
           return (
-            <path key={`str-${s.id}`}
-              d={d} fill="none" stroke={color} strokeWidth={sw}
-              filter={isActive ? 'url(#glow)' : undefined}
-            />
+            <g key={`str-${s.id}`}>
+              <path d={d} fill="none" stroke="rgba(0,0,0,0.35)" strokeWidth={sw} transform="translate(1.1,0.6)" />
+              <path d={d} fill="none" stroke={color} strokeWidth={sw}
+                    filter={isActive ? 'url(#glow)' : undefined} />
+              <path d={d} fill="none" strokeLinecap="round" transform="translate(-0.7,0)"
+                    stroke={isActive ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.5)'}
+                    strokeWidth={Math.max(0.4, sw * 0.34)} />
+            </g>
           )
         })}
+        {/* Bottom fade — strings melt into the neck */}
+        <rect x="0" y={svgH - 130} width="300" height="130" fill="url(#string-fade)" pointerEvents="none" />
 
-        {/* Tuning pegs */}
-        {[...leftPegs.map(p => ({ ...p, side: 'left' })),
-          ...rightPegs.map(p => ({ ...p, side: 'right' }))].map((p, i) => (
-          <g key={`peg-${i}`}>
+        {/* Tuning machines — nickel with bezel + specular */}
+        {[...leftPegs, ...rightPegs].map((p, i) => (
+          <g key={`peg-${i}`} filter="url(#peg-shadow)">
             <circle cx={p.x} cy={p.y} r={pegR}
-                    fill="url(#peg-grad)" stroke="#555" strokeWidth="1" />
-            <circle cx={p.x} cy={p.y} r={pegR * 0.42}
-                    fill="#999" stroke="#aaa" strokeWidth="0.5" />
+                    fill="url(#peg-metal)" stroke={dark ? "#2b2e33" : "#9aa0a8"} strokeWidth="1" />
+            <circle cx={p.x} cy={p.y} r={pegR * 0.72} fill="none"
+                    stroke="rgba(255,255,255,0.35)" strokeWidth="0.8" />
+            <circle cx={p.x} cy={p.y} r={pegR * 0.4}
+                    fill="url(#peg-center)" stroke="rgba(0,0,0,0.3)" strokeWidth="0.5" />
+            <circle cx={p.x - pegR * 0.28} cy={p.y - pegR * 0.32} r={pegR * 0.14}
+                    fill="rgba(255,255,255,0.8)" />
           </g>
         ))}
 
@@ -240,6 +295,7 @@ export default function GuitarHeadstock({
                onClick={() => { onPlay(s.freq); onStringSelect(s.id) }}>
               <circle cx={btn.x} cy={btn.y} r={buttonR}
                       fill={fill} stroke={stroke} strokeWidth={bsw} />
+              <circle cx={btn.x} cy={btn.y} r={buttonR} fill="url(#btn-sheen)" style={{ pointerEvents: 'none' }} />
               <text x={btn.x} y={btn.y}
                     textAnchor="middle" dominantBaseline="middle"
                     fontSize={labelSize} fill={labelColor}
