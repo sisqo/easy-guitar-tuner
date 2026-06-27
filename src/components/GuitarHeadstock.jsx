@@ -137,14 +137,14 @@ export default function GuitarHeadstock({
             <line x1="3.5" y1="0" x2="3.5" y2="120" stroke="rgba(255,210,140,0.07)" strokeWidth="0.5" />
           </pattern>
 
-          {/* Maple headstock — warm honey gradient left-to-right */}
+          {/* Maple headstock — dark: warm honey; light: bleached natural maple */}
           <linearGradient id="wood-h" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%"   stopColor="#7a4e18" />
-            <stop offset="18%"  stopColor="#b8822c" />
-            <stop offset="40%"  stopColor="#d4a040" />
-            <stop offset="55%"  stopColor="#c99238" />
-            <stop offset="78%"  stopColor="#b07828" />
-            <stop offset="100%" stopColor="#7a4e18" />
+            <stop offset="0%"   stopColor={dark ? "#7a4e18" : "#e2d4bc"} />
+            <stop offset="18%"  stopColor={dark ? "#b8822c" : "#f0e6d3"} />
+            <stop offset="40%"  stopColor={dark ? "#d4a040" : "#f8f3ea"} />
+            <stop offset="55%"  stopColor={dark ? "#c99238" : "#f4eedf"} />
+            <stop offset="78%"  stopColor={dark ? "#b07828" : "#ede4cf"} />
+            <stop offset="100%" stopColor={dark ? "#7a4e18" : "#e2d4bc"} />
           </linearGradient>
 
           {/* Gloss varnish — top highlight + subtle horizontal sheen */}
@@ -182,7 +182,7 @@ export default function GuitarHeadstock({
 
         {/* Headstock body — maple wood */}
         <rect x={hs.x} y={hs.y} width={hs.w} height={hs.h} rx={hs.rx}
-              fill="url(#wood-h)" stroke="#5a3510" strokeWidth="1.5" />
+              fill="url(#wood-h)" stroke={dark ? "#5a3510" : "#c8b89a"} strokeWidth="1.5" />
         <rect x={hs.x} y={hs.y} width={hs.w} height={hs.h} rx={hs.rx}
               fill="url(#woodgrain)" />
         <rect x={hs.x + 2} y={hs.y + 1} width={hs.w - 4}
