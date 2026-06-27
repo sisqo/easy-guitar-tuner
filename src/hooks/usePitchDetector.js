@@ -1,24 +1,16 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
 import { PitchDetector } from 'pitchy'
-
-const NOISE_GATE_RMS = 0.004
-const CLARITY_THRESHOLD = 0.88   // high: reject body resonances and ambient noise
-const MIN_FREQ = 70               // below lowest guitar string (E2=82Hz)
-const MAX_FREQ = 660              // above highest instrument note (B4=494Hz ukulele) + E5 octave margin
-const SMOOTH_FACTOR = 0.15
-const REJECT_THRESHOLD_CENTS = 30  // outlier: too far from smooth but not a new string
-const RESET_THRESHOLD_CENTS = 100  // large jump: treat as new string
-const HOLD_MS = 1500               // keep last reading visible after signal fades
+import { SETTINGS_DEFAULTS } from './useSettings'
 
 // Try ÷2, ×1, ×2 and pick whichever is nearest to reference (single octave correction)
-function nearestOctave(detected, reference) {
-  const candidates = [detected / 2, detected, detected * 2].filter(p => p >= MIN_FREQ && p <= MAX_FREQ)
+function nearestOctave(detected, reference, minFreq, maxFreq) {
+  const candidates = [detected / 2, detected, detected * 2].filter(p => p >= minFreq && p <= maxFreq)
   return candidates.reduce((best, p) =>
     Math.abs(Math.log2(p / reference)) < Math.abs(Math.log2(best / reference)) ? p : best
   )
 }
 
-export function usePitchDetector() {
+export function usePitchDetector(settingsRef) {
   const [isListening, setIsListening] = useState(false)
   const [pitch, setPitch] = useState(null)
   const [error, setError] = useState(null)
@@ -82,53 +74,53 @@ export function usePitchDetector() {
 
       setIsListening(true)
 
+      const MIN_FREQ = 70
+      const MAX_FREQ = 660
+
       const loop = () => {
+        // Read latest settings on every frame — no restart needed
+        const s = settingsRef?.current ?? SETTINGS_DEFAULTS
+
         analyser.getFloatTimeDomainData(buffer)
 
         let rms = 0
         for (let i = 0; i < buffer.length; i++) rms += buffer[i] * buffer[i]
         rms = Math.sqrt(rms / buffer.length)
 
-        if (rms >= NOISE_GATE_RMS) {
+        if (rms >= s.noiseGate) {
           const [detectedPitch, clarity] = detector.findPitch(buffer, ctx.sampleRate)
-          if (clarity >= CLARITY_THRESHOLD && detectedPitch >= MIN_FREQ && detectedPitch <= MAX_FREQ) {
+          if (clarity >= s.clarityThreshold && detectedPitch >= MIN_FREQ && detectedPitch <= MAX_FREQ) {
             const prev = smoothedPitchRef.current
             if (prev === null) {
               smoothedPitchRef.current = detectedPitch
             } else {
               const jumpCents = Math.abs(1200 * Math.log2(detectedPitch / prev))
-              if (jumpCents > RESET_THRESHOLD_CENTS) {
-                // Before accepting as a new string, check for octave error
-                const octaveCorrected = nearestOctave(detectedPitch, prev)
+              if (jumpCents > s.resetThreshold) {
+                const octaveCorrected = nearestOctave(detectedPitch, prev, MIN_FREQ, MAX_FREQ)
                 const correctedJump = Math.abs(1200 * Math.log2(octaveCorrected / prev))
-                if (correctedJump <= REJECT_THRESHOLD_CENTS) {
-                  // Same note, wrong octave detected — correct and smooth
-                  smoothedPitchRef.current = prev * (1 - SMOOTH_FACTOR) + octaveCorrected * SMOOTH_FACTOR
+                if (correctedJump <= s.rejectThreshold) {
+                  smoothedPitchRef.current = prev * (1 - s.smoothFactor) + octaveCorrected * s.smoothFactor
                 } else {
-                  smoothedPitchRef.current = detectedPitch  // genuine new string
+                  smoothedPitchRef.current = detectedPitch
                 }
-              } else if (jumpCents > REJECT_THRESHOLD_CENTS) {
-                // outlier: discard, keep current smooth
+              } else if (jumpCents > s.rejectThreshold) {
+                // outlier — discard
               } else {
-                smoothedPitchRef.current = prev * (1 - SMOOTH_FACTOR) + detectedPitch * SMOOTH_FACTOR
+                smoothedPitchRef.current = prev * (1 - s.smoothFactor) + detectedPitch * s.smoothFactor
               }
             }
             lastValidAtRef.current = performance.now()
             setPitch(smoothedPitchRef.current)
           } else {
             const elapsed = performance.now() - (lastValidAtRef.current ?? 0)
-            if (elapsed < HOLD_MS && smoothedPitchRef.current !== null) {
-              // hold last reading — don't update pitch
-            } else {
+            if (elapsed >= s.holdMs || smoothedPitchRef.current === null) {
               smoothedPitchRef.current = null
               setPitch(null)
             }
           }
         } else {
           const elapsed = performance.now() - (lastValidAtRef.current ?? 0)
-          if (elapsed < HOLD_MS && smoothedPitchRef.current !== null) {
-            // hold last reading during signal decay
-          } else {
+          if (elapsed >= s.holdMs || smoothedPitchRef.current === null) {
             smoothedPitchRef.current = null
             setPitch(null)
           }
@@ -142,7 +134,7 @@ export function usePitchDetector() {
       setError(err.name === 'NotAllowedError' ? 'Microphone access denied.' : err.message)
       setIsListening(false)
     }
-  }, [])
+  }, [settingsRef])
 
   useEffect(() => () => stop(), [stop])
 

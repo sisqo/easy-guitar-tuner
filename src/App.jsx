@@ -1,5 +1,6 @@
 import { useMemo, useEffect, useRef, useState } from 'react'
 import { useLocalStorage } from './hooks/useLocalStorage'
+import { useSettings } from './hooks/useSettings'
 import { usePitchDetector } from './hooks/usePitchDetector'
 import { useOscillator } from './hooks/useOscillator'
 import { useSuccessBeep } from './hooks/useSuccessBeep'
@@ -11,16 +12,22 @@ import TuningSelector from './components/TuningSelector'
 import TunerBar from './components/TunerBar'
 import GuitarHeadstock from './components/GuitarHeadstock'
 import MicButton from './components/MicButton'
-
-const DIAPASON = 440
+import SettingsPanel from './components/SettingsPanel'
 
 export default function App() {
   const [dark, setDark] = useLocalStorage('egt-dark', true)
   const [instrument, setInstrument] = useLocalStorage('egt-instrument', 'guitar6')
   const [tuningKey, setTuningKey] = useLocalStorage('egt-tuning', 'standard')
   const [lockedStringId, setLockedStringId] = useState(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
-  const { isListening, pitch, error, start, stop } = usePitchDetector()
+  const { settings, update, resetAll } = useSettings()
+
+  // Keep a ref so the RAF loop in usePitchDetector always reads latest settings
+  const settingsRef = useRef(settings)
+  useEffect(() => { settingsRef.current = settings }, [settings])
+
+  const { isListening, pitch, error, start, stop } = usePitchDetector(settingsRef)
   const { playNote } = useOscillator()
   const { beep } = useSuccessBeep()
 
@@ -31,7 +38,7 @@ export default function App() {
     document.documentElement.classList.toggle('dark', dark)
   }, [dark])
 
-  const allTunings = useMemo(() => getTunings(DIAPASON), [])
+  const allTunings = useMemo(() => getTunings(settings.diapason), [settings.diapason])
   const instrumentData = allTunings[instrument]
   const safeTuningKey = instrumentData.tunings[tuningKey] ? tuningKey : 'standard'
   const strings = instrumentData.tunings[safeTuningKey].strings
@@ -54,7 +61,7 @@ export default function App() {
       const locked = strings.find(s => s.id === lockedStringId)
       const cents = locked && pitch ? getCents(pitch, locked.freq) : null
       return {
-        displayNote: pitch ? freqToNoteName(pitch, DIAPASON) : null,
+        displayNote: pitch ? freqToNoteName(pitch, settings.diapason) : null,
         displayCents: cents ?? 0,
         activeStringId: lockedStringId,
         activeCents: cents ?? 0,
@@ -62,15 +69,15 @@ export default function App() {
     }
     const closest = findClosestString(pitch, strings)
     return {
-      displayNote: closest ? freqToNoteName(pitch, DIAPASON) : null,
+      displayNote: closest ? freqToNoteName(pitch, settings.diapason) : null,
       displayCents: closest?.cents ?? 0,
       activeStringId: closest?.id ?? null,
       activeCents: closest?.cents ?? 0,
     }
-  }, [lockedStringId, pitch, strings])
+  }, [lockedStringId, pitch, strings, settings.diapason])
 
   useEffect(() => {
-    if (isInTune(displayCents, 5) && displayNote) {
+    if (isInTune(displayCents, settings.inTuneThreshold) && displayNote) {
       if (inTuneStartRef.current === null) {
         inTuneStartRef.current = Date.now()
       } else if (Date.now() - inTuneStartRef.current >= 1500 && !beepFiredRef.current) {
@@ -81,7 +88,7 @@ export default function App() {
       inTuneStartRef.current = null
       beepFiredRef.current = false
     }
-  }, [displayCents, displayNote, beep])
+  }, [displayCents, displayNote, beep, settings.inTuneThreshold])
 
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 flex flex-col">
@@ -95,8 +102,19 @@ export default function App() {
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 tracking-wide">Chromatic tuner</p>
           </div>
         </div>
-        <div className="absolute right-4 top-1/2 -translate-y-1/2">
+        <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1">
           <ThemeToggle dark={dark} onToggle={() => setDark(d => !d)} />
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className="p-2 rounded-lg text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            aria-label="Impostazioni"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
         </div>
       </header>
 
@@ -113,15 +131,15 @@ export default function App() {
           />
         </div>
 
-
         <div className="rounded-2xl bg-white border border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800 px-5 py-4">
           <TunerBar
             cents={displayCents}
             note={displayNote}
             listening={isListening}
+            inTuneThreshold={settings.inTuneThreshold}
+            displaySmooth={settings.displaySmooth}
           />
         </div>
-
 
         <GuitarHeadstock
           strings={strings}
@@ -131,12 +149,21 @@ export default function App() {
           onStringSelect={handleLockToggle}
           onPlay={playNote}
           dark={dark}
+          inTuneThreshold={settings.inTuneThreshold}
         />
       </main>
 
       <footer className="text-center text-xs text-zinc-400 dark:text-zinc-700 py-3">
         build {__BUILD_COMMITS__} · {__BUILD_HASH__}
       </footer>
+
+      <SettingsPanel
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        settings={settings}
+        update={update}
+        resetAll={resetAll}
+      />
     </div>
   )
 }

@@ -2,15 +2,13 @@ import { useRef } from 'react'
 import { isInTune } from '../utils/noteUtils'
 
 const CENTS_RANGE = 50
-const DISPLAY_SMOOTH = 0.12
-// 5 ticks at display-scale positions (-10,-5,0,+5,+10) = (-50,-25,0,+25,+50 cents)
 const TICKS = [-50, -25, 0, 25, 50]
 
-export default function TunerBar({ cents, note, listening }) {
+export default function TunerBar({ cents, note, listening, inTuneThreshold = 5, displaySmooth = 0.12 }) {
   const displayCentsRef = useRef(0)
 
   if (note) {
-    displayCentsRef.current = displayCentsRef.current * (1 - DISPLAY_SMOOTH) + (cents ?? 0) * DISPLAY_SMOOTH
+    displayCentsRef.current = displayCentsRef.current * (1 - displaySmooth) + (cents ?? 0) * displaySmooth
   } else {
     displayCentsRef.current = 0
   }
@@ -18,7 +16,7 @@ export default function TunerBar({ cents, note, listening }) {
 
   const clampedCents = Math.max(-CENTS_RANGE, Math.min(CENTS_RANGE, displayCents))
   const pct = ((clampedCents + CENTS_RANGE) / (CENTS_RANGE * 2)) * 100
-  const inTune = note && isInTune(cents ?? 0, 5)
+  const inTune = note && isInTune(cents ?? 0, inTuneThreshold)
   const hasSignal = note !== null && note !== undefined
   const isSharp = hasSignal && !inTune && displayCents > 0
   const isFlat  = hasSignal && !inTune && displayCents < 0
@@ -53,10 +51,13 @@ export default function TunerBar({ cents, note, listening }) {
 
       {/* Tuner bar */}
       <div className="relative h-4 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
-        {/* Green zone ±1 unit (±5 cents) */}
+        {/* Green zone: width and position derived from inTuneThreshold */}
         <div
           className="absolute inset-y-0 bg-emerald-500/20 border-l border-r border-emerald-500/40"
-          style={{ left: '43%', width: '14%' }}
+          style={{
+            width: `${(inTuneThreshold / CENTS_RANGE) * 100}%`,
+            left: `${50 - (inTuneThreshold / CENTS_RANGE) * 50}%`,
+          }}
         />
 
         {/* Tick marks */}
