@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useRef, useState } from 'react'
+import { useMemo, useEffect, useRef, useState, useCallback } from 'react'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useSettings } from './hooks/useSettings'
 import { usePitchDetector } from './hooks/usePitchDetector'
@@ -20,6 +20,7 @@ export default function App() {
   const [tuningKey, setTuningKey] = useLocalStorage('egt-tuning', 'standard')
   const [lockedStringId, setLockedStringId] = useState(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [tunedStrings, setTunedStrings] = useState(() => new Set())
 
   const { settings, update, resetAll } = useSettings()
 
@@ -47,14 +48,20 @@ export default function App() {
     setInstrument(id)
     setTuningKey('standard')
     setLockedStringId(null)
+    setTunedStrings(new Set())
   }
   function handleTuningChange(key) {
     setTuningKey(key)
     setLockedStringId(null)
+    setTunedStrings(new Set())
   }
   function handleLockToggle(stringId) {
     setLockedStringId(prev => prev === stringId ? null : stringId)
   }
+  const handleStop = useCallback(() => {
+    stop()
+    setTunedStrings(new Set())
+  }, [stop])
 
   const { displayNote, displayCents, activeStringId, activeCents } = useMemo(() => {
     if (lockedStringId !== null) {
@@ -83,12 +90,15 @@ export default function App() {
       } else if (Date.now() - inTuneStartRef.current >= 1500 && !beepFiredRef.current) {
         beep()
         beepFiredRef.current = true
+        if (activeStringId !== null) {
+          setTunedStrings(prev => { const next = new Set(prev); next.add(activeStringId); return next })
+        }
       }
     } else {
       inTuneStartRef.current = null
       beepFiredRef.current = false
     }
-  }, [displayCents, displayNote, beep, settings.inTuneThreshold])
+  }, [displayCents, displayNote, beep, settings.inTuneThreshold, activeStringId])
 
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 flex flex-col">
@@ -111,12 +121,10 @@ export default function App() {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col gap-4 px-4 py-4 max-w-lg mx-auto w-full">
-        <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
+      <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-lg mx-auto w-full">
+        {/* Compact selector row */}
+        <div className="flex gap-2">
           <InstrumentTabs active={instrument} onChange={handleInstrumentChange} />
-          <div className="flex items-center justify-center" style={{ paddingBottom: '1px' }}>
-            <MicButton listening={isListening} error={error} onStart={start} onStop={stop} />
-          </div>
           <TuningSelector
             tunings={instrumentData.tunings}
             active={safeTuningKey}
@@ -124,6 +132,12 @@ export default function App() {
           />
         </div>
 
+        {/* Mic button — primary action */}
+        <div className="flex justify-center py-1">
+          <MicButton listening={isListening} error={error} onStart={start} onStop={handleStop} />
+        </div>
+
+        {/* Tuner bar */}
         <div className="rounded-2xl bg-white border border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800 px-5 py-4">
           {!isListening && !displayNote ? (
             <div className="flex flex-col items-center justify-center py-4 gap-1.5">
@@ -144,6 +158,7 @@ export default function App() {
           )}
         </div>
 
+        {/* Headstock */}
         <GuitarHeadstock
           strings={strings}
           activeStringId={activeStringId}
@@ -153,6 +168,7 @@ export default function App() {
           onPlay={playNote}
           dark={dark}
           inTuneThreshold={settings.inTuneThreshold}
+          tunedStrings={tunedStrings}
         />
       </main>
 

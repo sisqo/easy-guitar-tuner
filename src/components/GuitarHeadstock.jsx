@@ -97,18 +97,20 @@ function stringColor(s, activeStringId, lockedStringId, dark) {
   return dark ? '#52525b' : '#a1a1aa'
 }
 
-function buttonStyle(s, activeStringId, lockedStringId, activeCents, dark, inTuneThreshold) {
+function buttonStyle(s, activeStringId, lockedStringId, activeCents, dark, inTuneThreshold, tunedStrings) {
   const isLocked = s.id === lockedStringId
   const isActive = lockedStringId !== null ? isLocked : s.id === activeStringId
   const tuned = isActive && isInTune(activeCents, inTuneThreshold)
-  if (tuned)    return { fill: dark ? '#052e16' : '#ecfdf5', stroke: '#10b981', sw: 2.5 }
-  if (isLocked) return { fill: dark ? '#082f49' : '#f0f9ff', stroke: '#38bdf8', sw: 2.5 }
-  if (isActive) return { fill: dark ? '#1c1917' : '#fffbeb', stroke: '#fbbf24', sw: 2 }
-  return { fill: dark ? '#18181b' : '#ffffff', stroke: dark ? '#3f3f46' : '#d4d4d8', sw: 1.5 }
+  const isMarked = tunedStrings?.has(s.id) && !isActive
+  if (tuned)     return { fill: dark ? '#052e16' : '#ecfdf5', stroke: '#10b981', sw: 2.5, marker: false }
+  if (isLocked)  return { fill: dark ? '#082f49' : '#f0f9ff', stroke: '#38bdf8', sw: 2.5, marker: false }
+  if (isActive)  return { fill: dark ? '#1c1917' : '#fffbeb', stroke: '#fbbf24', sw: 2, marker: isMarked }
+  if (isMarked)  return { fill: dark ? '#18181b' : '#ffffff', stroke: '#10b981', sw: 2.5, marker: true }
+  return { fill: dark ? '#18181b' : '#ffffff', stroke: dark ? '#3f3f46' : '#d4d4d8', sw: 1.5, marker: false }
 }
 
 export default function GuitarHeadstock({
-  strings, activeStringId, lockedStringId, activeCents, onStringSelect, onPlay, dark, inTuneThreshold = 5,
+  strings, activeStringId, lockedStringId, activeCents, onStringSelect, onPlay, dark, inTuneThreshold = 5, tunedStrings,
 }) {
   const L = getLayout(strings.length)
   const { viewBox, svgH, headstock: hs, nutH, nutXs, leftPegs, rightPegs,
@@ -214,7 +216,7 @@ export default function GuitarHeadstock({
         {strings.map((s, i) => {
           const btn = getBtnPos(i, L)
           if (!btn) return null
-          const { fill, stroke, sw: bsw } = buttonStyle(s, activeStringId, lockedStringId, activeCents, dark, inTuneThreshold)
+          const { fill, stroke, sw: bsw, marker } = buttonStyle(s, activeStringId, lockedStringId, activeCents, dark, inTuneThreshold, tunedStrings)
           return (
             <g key={`btn-${s.id}`} style={{ cursor: 'pointer' }} filter="url(#btn-shadow)"
                onClick={() => onStringSelect(s.id)}>
@@ -234,6 +236,19 @@ export default function GuitarHeadstock({
                     onClick={e => { e.stopPropagation(); onPlay(s.freq) }}>
                 ▶
               </text>
+              {marker && (
+                <text
+                  key={`marker-${s.id}`}
+                  x={btn.x + buttonR * 0.52}
+                  y={btn.y - buttonR * 0.52}
+                  textAnchor="middle" dominantBaseline="middle"
+                  fontSize={buttonR >= 20 ? 8 : 6}
+                  fill="#10b981"
+                  fontFamily="monospace"
+                  className="marker-appear"
+                  style={{ userSelect: 'none', pointerEvents: 'none' }}
+                >✓</text>
+              )}
             </g>
           )
         })}
