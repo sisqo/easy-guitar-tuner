@@ -120,7 +120,7 @@ export default function App() {
     }
   }
 
-  const { displayNote, displayCents, activeStringId, activeCents } = useMemo(() => {
+  const { displayNote, displayCents, activeStringId, activeFreq, activeCents } = useMemo(() => {
     if (lockedStringId !== null) {
       const locked = strings.find(s => s.id === lockedStringId)
       const cents = locked && pitch ? getCents(pitch, locked.freq) : null
@@ -128,6 +128,7 @@ export default function App() {
         displayNote: pitch ? freqToNoteName(pitch, settings.diapason) : null,
         displayCents: cents ?? 0,
         activeStringId: lockedStringId,
+        activeFreq: locked?.freq ?? null,
         activeCents: cents ?? 0,
       }
     }
@@ -136,6 +137,7 @@ export default function App() {
       displayNote: closest ? freqToNoteName(pitch, settings.diapason) : null,
       displayCents: closest?.cents ?? 0,
       activeStringId: closest?.id ?? null,
+      activeFreq: closest?.freq ?? null,
       activeCents: closest?.cents ?? 0,
     }
   }, [lockedStringId, pitch, strings, settings.diapason])
@@ -148,7 +150,10 @@ export default function App() {
         beep()
         beepFiredRef.current = true
         if (activeStringId !== null) {
-          setTunedStrings(prev => { const next = new Set(prev); next.add(activeStringId); return next })
+          // Mark all same-frequency strings as tuned (covers unison pairs like B3/B3')
+          const aFreq = strings.find(s => s.id === activeStringId)?.freq
+          const companions = strings.filter(s => aFreq != null && Math.abs(s.freq - aFreq) < 0.01).map(s => s.id)
+          setTunedStrings(prev => { const next = new Set(prev); companions.forEach(id => next.add(id)); return next })
         }
       }
     } else {
@@ -227,6 +232,7 @@ export default function App() {
         <GuitarHeadstock
           strings={strings}
           activeStringId={activeStringId}
+          activeFreq={activeFreq}
           lockedStringId={lockedStringId}
           activeCents={activeCents}
           onStringSelect={handleLockToggle}

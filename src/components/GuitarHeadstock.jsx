@@ -91,15 +91,21 @@ function stringPath(strX, nutY, peg, svgH) {
   ].join(' ')
 }
 
-function stringColor(s, activeStringId, lockedStringId, dark) {
+function isSameFreq(a, b) {
+  return a != null && b != null && Math.abs(a - b) < 0.01
+}
+
+function stringColor(s, activeStringId, lockedStringId, dark, activeFreq) {
   if (s.id === lockedStringId) return '#38bdf8'
-  if (lockedStringId === null && s.id === activeStringId) return dark ? '#e4e4e7' : '#3f3f46'
+  if (lockedStringId === null && (s.id === activeStringId || isSameFreq(s.freq, activeFreq)))
+    return dark ? '#e4e4e7' : '#3f3f46'
   return dark ? '#52525b' : '#a1a1aa'
 }
 
-function buttonStyle(s, activeStringId, lockedStringId, activeCents, dark, inTuneThreshold, tunedStrings) {
+function buttonStyle(s, activeStringId, lockedStringId, activeCents, dark, inTuneThreshold, tunedStrings, activeFreq) {
   const isLocked = s.id === lockedStringId
-  const isActive = lockedStringId !== null ? isLocked : s.id === activeStringId
+  // In auto mode, also treat same-frequency companions as active (unison course pairs)
+  const isActive = lockedStringId !== null ? isLocked : (s.id === activeStringId || isSameFreq(s.freq, activeFreq))
   const tuned = isActive && isInTune(activeCents, inTuneThreshold)
   const isMarked = tunedStrings?.has(s.id) && !isActive
   if (tuned)     return { fill: dark ? '#052e16' : '#ecfdf5', stroke: '#10b981', sw: 2.5, marker: false }
@@ -110,7 +116,7 @@ function buttonStyle(s, activeStringId, lockedStringId, activeCents, dark, inTun
 }
 
 export default function GuitarHeadstock({
-  strings, activeStringId, lockedStringId, activeCents, onStringSelect, onPlay, dark, inTuneThreshold = 5, tunedStrings,
+  strings, activeStringId, activeFreq, lockedStringId, activeCents, onStringSelect, onPlay, dark, inTuneThreshold = 5, tunedStrings,
 }) {
   const L = getLayout(strings.length)
   const { viewBox, svgH, headstock: hs, nutH, nutXs, leftPegs, rightPegs,
@@ -204,7 +210,7 @@ export default function GuitarHeadstock({
           if (!res) return null
           const isActive = lockedStringId !== null ? s.id === lockedStringId : s.id === activeStringId
           const d = stringPath(nutXs[i], nutY, res.peg, svgH)
-          const color = stringColor(s, activeStringId, lockedStringId, dark)
+          const color = stringColor(s, activeStringId, lockedStringId, dark, activeFreq)
           const sw = strWidths[i] ?? 1
           return (
             <path key={`str-${s.id}`}
@@ -229,7 +235,7 @@ export default function GuitarHeadstock({
         {strings.map((s, i) => {
           const btn = getBtnPos(i, L)
           if (!btn) return null
-          const { fill, stroke, sw: bsw, marker } = buttonStyle(s, activeStringId, lockedStringId, activeCents, dark, inTuneThreshold, tunedStrings)
+          const { fill, stroke, sw: bsw, marker } = buttonStyle(s, activeStringId, lockedStringId, activeCents, dark, inTuneThreshold, tunedStrings, activeFreq)
           return (
             <g key={`btn-${s.id}`} style={{ cursor: 'pointer' }} filter="url(#btn-shadow)"
                onClick={() => onStringSelect(s.id)}>
