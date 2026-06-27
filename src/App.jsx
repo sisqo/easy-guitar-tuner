@@ -73,14 +73,6 @@ export default function App() {
   const settingsRef = useRef(settings)
   useEffect(() => { settingsRef.current = settings }, [settings])
 
-  // Keep a ref so the RAF loop can do string-aware octave correction without restart
-  const stringsRef = useRef(strings)
-  useEffect(() => { stringsRef.current = strings }, [strings])
-
-  const { isListening, pitch, error, start, stop } = usePitchDetector(settingsRef, stringsRef)
-  const { playNote } = useOscillator()
-  const { beep } = useSuccessBeep()
-
   const inTuneStartRef = useRef(null)
   const beepFiredRef = useRef(false)
 
@@ -92,6 +84,14 @@ export default function App() {
   const instrumentData = allTunings[instrument]
   const safeTuningKey = instrumentData.tunings[tuningKey] ? tuningKey : 'standard'
   const strings = instrumentData.tunings[safeTuningKey].strings
+
+  // Keep a ref so the RAF loop can do string-aware octave correction without restart
+  const stringsRef = useRef(strings)
+  useEffect(() => { stringsRef.current = strings }, [strings])
+
+  const { isListening, pitch, error, start, stop } = usePitchDetector(settingsRef, stringsRef)
+  const { playNote } = useOscillator()
+  const { beep } = useSuccessBeep()
 
   function handleInstrumentChange(id) {
     setInstrument(id)
