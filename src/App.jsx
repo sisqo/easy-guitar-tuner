@@ -155,7 +155,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 flex flex-col">
-      <header className="relative flex items-center justify-center px-4 py-3 border-b border-zinc-200 dark:border-zinc-800">
+      <header className="relative z-10 flex items-center justify-center px-4 py-3 border-b border-zinc-200 dark:border-zinc-800">
         <div className="flex items-center gap-4">
           <img src="/logo.png" alt="" className="w-10 h-10 rounded-xl" />
           <div>
