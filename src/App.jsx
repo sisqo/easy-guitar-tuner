@@ -4,6 +4,7 @@ import { useSettings } from './hooks/useSettings'
 import { usePitchDetector } from './hooks/usePitchDetector'
 import { useOscillator } from './hooks/useOscillator'
 import { useSuccessBeep } from './hooks/useSuccessBeep'
+import { useInstallPrompt } from './hooks/useInstallPrompt'
 import { getTunings } from './data/tunings'
 import { findClosestString, freqToNoteName, getCents, isInTune } from './utils/noteUtils'
 import HamburgerMenu from './components/HamburgerMenu'
@@ -62,6 +63,9 @@ export default function App() {
   const [lockedStringId, setLockedStringId] = useState(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [tunedStrings, setTunedStrings] = useState(() => new Set())
+  const [iosSheetOpen, setIosSheetOpen] = useState(false)
+
+  const { canInstall, isIOS, showInstallOption, install } = useInstallPrompt()
 
   const { settings, update, resetAll } = useSettings()
 
@@ -103,6 +107,14 @@ export default function App() {
     stop()
     setTunedStrings(new Set())
   }, [stop])
+
+  function handleInstall() {
+    if (canInstall) {
+      install()
+    } else if (isIOS) {
+      setIosSheetOpen(true)
+    }
+  }
 
   const { displayNote, displayCents, activeStringId, activeCents } = useMemo(() => {
     if (lockedStringId !== null) {
@@ -158,6 +170,8 @@ export default function App() {
             dark={dark}
             onToggleTheme={() => setDark(d => !d)}
             onOpenSettings={() => setSettingsOpen(true)}
+            showInstallOption={showInstallOption}
+            onInstall={handleInstall}
           />
         </div>
       </header>
@@ -230,6 +244,59 @@ export default function App() {
         update={update}
         resetAll={resetAll}
       />
+
+      {iosSheetOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+            onClick={() => setIosSheetOpen(false)}
+          />
+          <div className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-zinc-900 rounded-t-2xl border-t border-zinc-200 dark:border-zinc-800 px-6 pt-5 pb-8 max-w-lg mx-auto">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">Add to Home Screen</h2>
+              <button
+                onClick={() => setIosSheetOpen(false)}
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <ol className="flex flex-col gap-4">
+              <li className="flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-[#2aab9e] text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
+                <div className="flex-1">
+                  <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-snug">
+                    Tap the <strong className="text-zinc-900 dark:text-zinc-100">Share</strong> button in the Safari toolbar
+                  </p>
+                  <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    <span className="text-xs text-zinc-500 dark:text-zinc-400">Share</span>
+                  </div>
+                </div>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-[#2aab9e] text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
+                <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-snug pt-0.5">
+                  Scroll down and tap <strong className="text-zinc-900 dark:text-zinc-100">Add to Home Screen</strong>
+                </p>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-[#2aab9e] text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
+                <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-snug pt-0.5">
+                  Tap <strong className="text-zinc-900 dark:text-zinc-100">Add</strong> to confirm
+                </p>
+              </li>
+            </ol>
+            <p className="mt-5 text-xs text-zinc-400 dark:text-zinc-600">
+              Open this page in Safari if you don't see the Share button.
+            </p>
+          </div>
+        </>
+      )}
     </div>
   )
 }

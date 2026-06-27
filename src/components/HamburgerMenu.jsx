@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 
-export default function HamburgerMenu({ dark, onToggleTheme, onOpenSettings }) {
+export default function HamburgerMenu({ dark, onToggleTheme, onOpenSettings, showInstallOption, onInstall }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
 
@@ -17,15 +17,9 @@ export default function HamburgerMenu({ dark, onToggleTheme, onOpenSettings }) {
     }
   }, [open])
 
-  function handleSettings() {
-    setOpen(false)
-    onOpenSettings()
-  }
-
-  function handleTheme() {
-    setOpen(false)
-    onToggleTheme()
-  }
+  function handleSettings() { setOpen(false); onOpenSettings() }
+  function handleTheme() { setOpen(false); onToggleTheme() }
+  function handleInstall() { setOpen(false); onInstall?.() }
 
   return (
     <div ref={ref} className="relative">
@@ -41,7 +35,7 @@ export default function HamburgerMenu({ dark, onToggleTheme, onOpenSettings }) {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-48 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 shadow-lg shadow-black/10 dark:shadow-black/40 overflow-hidden z-50">
+        <div className="absolute right-0 top-full mt-2 w-52 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 shadow-lg shadow-black/10 dark:shadow-black/40 overflow-hidden z-50">
           <button
             onClick={handleTheme}
             className="flex items-center gap-3 w-full px-4 py-3 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700/60 transition-colors"
@@ -71,6 +65,21 @@ export default function HamburgerMenu({ dark, onToggleTheme, onOpenSettings }) {
             </svg>
             Settings
           </button>
+
+          {showInstallOption && (
+            <>
+              <div className="h-px bg-zinc-100 dark:bg-zinc-700 mx-3" />
+              <button
+                onClick={handleInstall}
+                className="flex items-center gap-3 w-full px-4 py-3 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700/60 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+                Add to Home Screen
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>
