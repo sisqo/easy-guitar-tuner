@@ -14,6 +14,47 @@ import GuitarHeadstock from './components/GuitarHeadstock'
 import MicButton from './components/MicButton'
 import SettingsPanel from './components/SettingsPanel'
 
+function AutoToggle({ lockedStringId, activeStringId, strings, onToggle }) {
+  const isLocked = lockedStringId !== null
+  const lockedString = isLocked ? strings.find(s => s.id === lockedStringId) : null
+
+  function handleClick() {
+    if (isLocked) {
+      onToggle(lockedStringId)
+    } else if (activeStringId !== null) {
+      onToggle(activeStringId)
+    }
+  }
+
+  return (
+    <button
+      onClick={handleClick}
+      aria-label={isLocked ? `Locked to ${lockedString?.label ?? 'string'} — tap to switch to Auto` : 'Auto mode — tap a string or here to lock'}
+      className={`shrink-0 flex items-center gap-1.5 px-2.5 rounded-lg border transition-colors cursor-pointer ${
+        isLocked
+          ? 'bg-sky-50 border-sky-200 text-sky-700 dark:bg-sky-950/60 dark:border-sky-800 dark:text-sky-300'
+          : 'bg-zinc-100 border-zinc-200 text-zinc-500 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-400'
+      }`}
+      style={{ fontSize: '12px', height: '34px' }}
+    >
+      {isLocked ? (
+        <>
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+          <span className="font-semibold">{lockedString?.label ?? '—'}</span>
+        </>
+      ) : (
+        <>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+          <span>Auto</span>
+        </>
+      )}
+    </button>
+  )
+}
+
 export default function App() {
   const [dark, setDark] = useLocalStorage('egt-dark', true)
   const [instrument, setInstrument] = useLocalStorage('egt-instrument', 'guitar6')
@@ -122,13 +163,19 @@ export default function App() {
       </header>
 
       <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-lg mx-auto w-full">
-        {/* Compact selector row */}
-        <div className="flex gap-2">
+        {/* Compact selector row + Auto toggle */}
+        <div className="flex gap-2 items-center">
           <InstrumentTabs active={instrument} onChange={handleInstrumentChange} />
           <TuningSelector
             tunings={instrumentData.tunings}
             active={safeTuningKey}
             onChange={handleTuningChange}
+          />
+          <AutoToggle
+            lockedStringId={lockedStringId}
+            activeStringId={activeStringId}
+            strings={strings}
+            onToggle={handleLockToggle}
           />
         </div>
 
