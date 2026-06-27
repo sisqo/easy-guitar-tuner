@@ -101,9 +101,9 @@ function buttonStyle(s, activeStringId, lockedStringId, activeCents, dark, inTun
   const isLocked = s.id === lockedStringId
   const isActive = lockedStringId !== null ? isLocked : s.id === activeStringId
   const tuned = isActive && isInTune(activeCents, inTuneThreshold)
-  if (tuned)    return { fill: dark ? '#052e16' : '#ecfdf5', stroke: '#22c55e', sw: 2.5 }
-  if (isLocked) return { fill: dark ? '#082f49' : '#f0f9ff', stroke: '#0ea5e9', sw: 2.5 }
-  if (isActive) return { fill: dark ? '#1c1917' : '#fffbeb', stroke: '#d97706', sw: 2 }
+  if (tuned)    return { fill: dark ? '#052e16' : '#ecfdf5', stroke: '#10b981', sw: 2.5 }
+  if (isLocked) return { fill: dark ? '#082f49' : '#f0f9ff', stroke: '#38bdf8', sw: 2.5 }
+  if (isActive) return { fill: dark ? '#1c1917' : '#fffbeb', stroke: '#fbbf24', sw: 2 }
   return { fill: dark ? '#18181b' : '#ffffff', stroke: dark ? '#3f3f46' : '#d4d4d8', sw: 1.5 }
 }
 

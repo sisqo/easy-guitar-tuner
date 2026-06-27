@@ -125,13 +125,23 @@ export default function App() {
         </div>
 
         <div className="rounded-2xl bg-white border border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800 px-5 py-4">
-          <TunerBar
-            cents={displayCents}
-            note={displayNote}
-            listening={isListening}
-            inTuneThreshold={settings.inTuneThreshold}
-            displaySmooth={settings.displaySmooth}
-          />
+          {!isListening && !displayNote ? (
+            <div className="flex flex-col items-center justify-center py-4 gap-1.5">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-zinc-300 dark:text-zinc-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                  d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4M12 3a4 4 0 014 4v4a4 4 0 01-8 0V7a4 4 0 014-4z" />
+              </svg>
+              <p className="text-sm text-zinc-400 dark:text-zinc-600">Tap the mic button to start tuning</p>
+            </div>
+          ) : (
+            <TunerBar
+              cents={displayCents}
+              note={displayNote}
+              listening={isListening}
+              inTuneThreshold={settings.inTuneThreshold}
+              displaySmooth={settings.displaySmooth}
+            />
+          )}
         </div>
 
         <GuitarHeadstock
