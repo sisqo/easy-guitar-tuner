@@ -94,12 +94,12 @@ export default function App() {
     <div className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 flex flex-col">
       <header className="relative flex items-center justify-center px-4 py-3 border-b border-zinc-200 dark:border-zinc-800">
         <div className="flex items-center gap-4">
-          <img src="/logo.png" alt="" className="w-14 h-14 rounded-2xl" />
+          <img src="/logo.png" alt="" className="w-10 h-10 rounded-xl" />
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 leading-none">
+            <h1 className="text-lg font-bold tracking-tight text-zinc-900 dark:text-zinc-100 leading-none">
               Easy<span style={{ color: '#2aab9e' }}>Guitar</span>Tuner
             </h1>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 tracking-wide">Chromatic tuner</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 tracking-wide">Chromatic tuner</p>
           </div>
         </div>
         <div className="absolute right-4 top-1/2 -translate-y-1/2">
