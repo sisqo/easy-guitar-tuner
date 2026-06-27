@@ -49,7 +49,7 @@ function Slider({ label, description, info, settingKey, value, min, max, step, f
         min={min} max={max} step={step}
         value={value}
         onChange={e => update(settingKey, parseFloat(e.target.value))}
-        className="w-full accent-[#2aab9e] h-1.5 rounded-full"
+        className="egt-range w-full text-zinc-200 dark:text-zinc-700"
       />
       <div className="flex justify-between text-xs text-zinc-400 dark:text-zinc-600">
         <span>{format ? format(min) : min}</span>

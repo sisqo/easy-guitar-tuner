@@ -30,6 +30,51 @@ body {
   animation: marker-appear 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Tuner readout entrance — plays once when a signal first appears */
+@keyframes egt-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.egt-enter {
+  animation: egt-enter 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Precision slider — custom track + thumb (settings panel) */
+.egt-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 9999px;
+  background: currentColor; /* track tint set via text color utility */
+  outline: none;
+}
+.egt-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: #2aab9e;
+  border: 2px solid #f4f4f5;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transition: transform 0.12s ease-out;
+}
+.egt-range::-webkit-slider-thumb:active { transform: scale(1.18); }
+.egt-range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #2aab9e;
+  border: 2px solid #f4f4f5;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+.dark .egt-range::-webkit-slider-thumb { border-color: #18181b; }
+.dark .egt-range::-moz-range-thumb { border-color: #18181b; }
+
 @media (prefers-reduced-motion: reduce) {
-  .marker-appear { animation: none; }
+  .marker-appear,
+  .egt-enter { animation: none; }
 }
