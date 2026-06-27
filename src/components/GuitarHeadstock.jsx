@@ -126,7 +126,6 @@ export default function GuitarHeadstock({
   const bgColor    = dark ? '#09090b' : '#f4f4f5'
   const dotColor   = dark ? '#27272a' : '#d4d4d8'
   const labelColor = dark ? '#ffffff' : '#3f3f46'
-  const playColor  = dark ? '#71717a' : '#a1a1aa'
 
   return (
     <div className="rounded-2xl bg-zinc-100 border border-zinc-200 dark:bg-zinc-950 dark:border-zinc-800 p-2 flex justify-center overflow-hidden">
@@ -231,29 +230,26 @@ export default function GuitarHeadstock({
           </g>
         ))}
 
-        {/* Note buttons */}
+        {/* Note buttons — a single tap toggles the lock and plays the reference tone */}
         {strings.map((s, i) => {
           const btn = getBtnPos(i, L)
           if (!btn) return null
           const { fill, stroke, sw: bsw, marker } = buttonStyle(s, activeStringId, lockedStringId, activeCents, dark, inTuneThreshold, tunedStrings, activeFreq)
           return (
             <g key={`btn-${s.id}`} style={{ cursor: 'pointer' }} filter="url(#btn-shadow)"
-               onClick={() => onStringSelect(s.id)}>
+               onClick={() => {
+                 // Play the reference tone when locking/switching, but stay silent on unlock
+                 if (s.id !== lockedStringId) onPlay(s.freq)
+                 onStringSelect(s.id)
+               }}>
               <circle cx={btn.x} cy={btn.y} r={buttonR}
                       fill={fill} stroke={stroke} strokeWidth={bsw} />
-              <text x={btn.x} y={btn.y - (buttonR >= 20 ? 4 : 3)}
+              <text x={btn.x} y={btn.y}
                     textAnchor="middle" dominantBaseline="middle"
                     fontSize={labelSize} fill={labelColor}
                     fontFamily="'JetBrains Mono', monospace" fontWeight="700"
                     style={{ userSelect: 'none', pointerEvents: 'none' }}>
                 {s.label}
-              </text>
-              <text x={btn.x} y={btn.y + (buttonR >= 20 ? 10 : 7)}
-                    textAnchor="middle" dominantBaseline="middle"
-                    fontSize={8} fill={playColor} fontFamily="monospace"
-                    style={{ userSelect: 'none' }}
-                    onClick={e => { e.stopPropagation(); onPlay(s.freq) }}>
-                ▶
               </text>
               {marker && (
                 <text
