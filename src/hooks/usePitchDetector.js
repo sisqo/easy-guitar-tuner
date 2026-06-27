@@ -54,6 +54,12 @@ export function usePitchDetector(settingsRef, stringsRef) {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
       })
+      // With the mic live, iOS routes output to the earpiece by default. 'play-and-record'
+      // maps to AVAudioSession's .defaultToSpeaker — i.e. speakerphone — so the reference
+      // tone comes out the loud bottom speaker instead.
+      if ('audioSession' in navigator) {
+        try { navigator.audioSession.type = 'play-and-record' } catch { /* unsupported */ }
+      }
       const ctx = new AudioContext()
       const analyser = ctx.createAnalyser()
       analyser.fftSize = 4096
@@ -152,7 +158,7 @@ export function usePitchDetector(settingsRef, stringsRef) {
       setError(err.name === 'NotAllowedError' ? 'Microphone access denied.' : err.message)
       setIsListening(false)
     }
-  }, [settingsRef])
+  }, [settingsRef, stringsRef])
 
   useEffect(() => () => stop(), [stop])
 

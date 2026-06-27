@@ -5,8 +5,13 @@ export function useOscillator() {
   const oscRef = useRef(null)
 
   const playNote = useCallback((frequency, duration = 1.5) => {
+    const firstTime = !ctxRef.current
     const ctx = ctxRef.current || new (window.AudioContext || window.webkitAudioContext)()
     ctxRef.current = ctx
+    // Route to the loudspeaker (speakerphone), not the iOS earpiece, when the mic is live
+    if (firstTime && 'audioSession' in navigator) {
+      try { navigator.audioSession.type = 'play-and-record' } catch { /* unsupported */ }
+    }
     // Mobile browsers start the context suspended until a user gesture resumes it
     if (ctx.state === 'suspended') ctx.resume()
 
