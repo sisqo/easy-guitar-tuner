@@ -237,11 +237,7 @@ export default function GuitarHeadstock({
           const { fill, stroke, sw: bsw, marker } = buttonStyle(s, activeStringId, lockedStringId, activeCents, dark, inTuneThreshold, tunedStrings, activeFreq)
           return (
             <g key={`btn-${s.id}`} style={{ cursor: 'pointer' }} filter="url(#btn-shadow)"
-               onClick={() => {
-                 // Play the reference tone when locking/switching, but stay silent on unlock
-                 if (s.id !== lockedStringId) onPlay(s.freq)
-                 onStringSelect(s.id)
-               }}>
+               onClick={() => { onPlay(s.freq); onStringSelect(s.id) }}>
               <circle cx={btn.x} cy={btn.y} r={buttonR}
                       fill={fill} stroke={stroke} strokeWidth={bsw} />
               <text x={btn.x} y={btn.y}

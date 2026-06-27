@@ -5,25 +5,32 @@ export function useOscillator() {
   const oscRef = useRef(null)
 
   const playNote = useCallback((frequency, duration = 1.5) => {
+    const ctx = ctxRef.current || new (window.AudioContext || window.webkitAudioContext)()
+    ctxRef.current = ctx
+    // Mobile browsers start the context suspended until a user gesture resumes it
+    if (ctx.state === 'suspended') ctx.resume()
+
+    // Stop any note still sounding so the new one always starts cleanly
     if (oscRef.current) {
-      oscRef.current.stop()
+      try { oscRef.current.stop() } catch { /* already stopped */ }
       oscRef.current = null
     }
 
-    const ctx = ctxRef.current || new AudioContext()
-    ctxRef.current = ctx
-
+    const now = ctx.currentTime
     const gainNode = ctx.createGain()
-    gainNode.gain.setValueAtTime(0.4, ctx.currentTime)
-    gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration)
+    // Fast exponential attack (avoids a click) up to a loud peak, then decay
+    gainNode.gain.setValueAtTime(0.0001, now)
+    gainNode.gain.exponentialRampToValueAtTime(0.85, now + 0.012)
+    gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration)
     gainNode.connect(ctx.destination)
 
     const osc = ctx.createOscillator()
-    osc.type = 'sine'
+    osc.type = 'triangle' // fuller / louder perceived tone than a pure sine
     osc.frequency.value = frequency
     osc.connect(gainNode)
-    osc.start()
-    osc.stop(ctx.currentTime + duration)
+    osc.start(now)
+    osc.stop(now + duration)
+    osc.onended = () => { try { gainNode.disconnect() } catch { /* noop */ } }
     oscRef.current = osc
   }, [])
 
