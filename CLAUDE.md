@@ -37,7 +37,7 @@ All detection parameters live in `useSettings` (persisted to localStorage as `eg
 Runs a `requestAnimationFrame` loop on a 4096-sample `AnalyserNode` (no smoothing). Each frame goes through these gates in order:
 
 1. **Noise gate** — RMS < `noiseGate` (default 0.001) → hold or clear
-2. **Clarity + range** — pitchy clarity ≥ `clarityThreshold` (default 0.98), frequency 70–660 Hz
+2. **Clarity + range** — pitchy clarity ≥ `clarityThreshold` (default 0.90), frequency 70–660 Hz
 3. **Outlier rejection** — jump `rejectThreshold`–`resetThreshold` cents from smooth → discard
 4. **Octave correction** — jump > `resetThreshold` cents → try ÷2/×2; if the corrected value fits, it's an octave error not a string change
 5. **Reset** — jump > `resetThreshold` and not an octave error → new string
@@ -55,7 +55,7 @@ Stored in localStorage as `egt-settings`. Defaults in `SETTINGS_DEFAULTS` (expor
 |-----|---------|-------------|
 | `diapason` | 440 | A4 reference Hz |
 | `noiseGate` | 0.001 | Min RMS to start detection |
-| `clarityThreshold` | 0.98 | Min pitchy confidence |
+| `clarityThreshold` | 0.90 | Min pitchy confidence |
 | `smoothFactor` | 0.15 | EMA on raw pitch |
 | `holdMs` | 1500 | Note hold after silence (ms) |
 | `inTuneThreshold` | 5 | In-tune zone (±cents) |
