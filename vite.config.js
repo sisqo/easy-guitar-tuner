@@ -7,8 +7,15 @@ import { execSync } from 'child_process'
 // Node 18 doesn't expose crypto as a global — polyfill for vite-plugin-pwa/workbox
 if (!globalThis.crypto) globalThis.crypto = webcrypto
 
-const commitCount = execSync('git rev-list --count HEAD').toString().trim()
-const commitHash  = execSync('git rev-parse --short HEAD').toString().trim()
+// Build constants from git. CLI deploys (`vercel --prod`) upload sources without
+// the .git directory, so these commands fail there — fall back to the env vars
+// Vercel injects, then to a placeholder, so the build never hard-fails.
+function sh(cmd, fallback) {
+  try { return execSync(cmd, { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim() }
+  catch { return fallback }
+}
+const commitCount = sh('git rev-list --count HEAD', '0')
+const commitHash  = sh('git rev-parse --short HEAD', (process.env.VERCEL_GIT_COMMIT_SHA || 'dev').slice(0, 7))
 
 export default defineConfig({
   define: {
