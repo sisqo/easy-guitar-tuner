@@ -2,13 +2,13 @@ import { useLocalStorage } from './useLocalStorage'
 
 export const SETTINGS_DEFAULTS = {
   diapason:          440,
-  noiseGate:         0.004,
-  clarityThreshold:  0.88,
+  noiseGate:         0.001,
+  clarityThreshold:  0.98,
   smoothFactor:      0.15,
   holdMs:            1500,
   inTuneThreshold:   5,
   displaySmooth:     0.12,
-  rejectThreshold:   30,
+  rejectThreshold:   75,
   resetThreshold:    100,
 }
 
