@@ -10,7 +10,7 @@ function nearestOctave(detected, reference, minFreq, maxFreq) {
   )
 }
 
-export function usePitchDetector(settingsRef) {
+export function usePitchDetector(settingsRef, stringsRef) {
   const [isListening, setIsListening] = useState(false)
   const [pitch, setPitch] = useState(null)
   const [error, setError] = useState(null)
@@ -96,10 +96,28 @@ export function usePitchDetector(settingsRef) {
             } else {
               const jumpCents = Math.abs(1200 * Math.log2(detectedPitch / prev))
               if (jumpCents > s.resetThreshold) {
-                const octaveCorrected = nearestOctave(detectedPitch, prev, MIN_FREQ, MAX_FREQ)
-                const correctedJump = Math.abs(1200 * Math.log2(octaveCorrected / prev))
+                const strings = stringsRef?.current
+                let bestCandidate
+                if (strings && strings.length > 0) {
+                  // Prefer detected pitch on ties (detected-first + strict <) so that
+                  // on 12-string, playing E3 beats the ÷2=E2 candidate even though both
+                  // are 0 cents from a real string.
+                  const candidates = [detectedPitch, detectedPitch / 2, detectedPitch * 2]
+                    .filter(p => p >= MIN_FREQ && p <= MAX_FREQ)
+                  let minDist = Infinity
+                  bestCandidate = detectedPitch
+                  for (const candidate of candidates) {
+                    for (const s of strings) {
+                      const dist = Math.abs(1200 * Math.log2(candidate / s.freq))
+                      if (dist < minDist) { minDist = dist; bestCandidate = candidate }
+                    }
+                  }
+                } else {
+                  bestCandidate = nearestOctave(detectedPitch, prev, MIN_FREQ, MAX_FREQ)
+                }
+                const correctedJump = Math.abs(1200 * Math.log2(bestCandidate / prev))
                 if (correctedJump <= s.rejectThreshold) {
-                  smoothedPitchRef.current = prev * (1 - s.smoothFactor) + octaveCorrected * s.smoothFactor
+                  smoothedPitchRef.current = prev * (1 - s.smoothFactor) + bestCandidate * s.smoothFactor
                 } else {
                   smoothedPitchRef.current = detectedPitch
                 }

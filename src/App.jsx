@@ -73,7 +73,11 @@ export default function App() {
   const settingsRef = useRef(settings)
   useEffect(() => { settingsRef.current = settings }, [settings])
 
-  const { isListening, pitch, error, start, stop } = usePitchDetector(settingsRef)
+  // Keep a ref so the RAF loop can do string-aware octave correction without restart
+  const stringsRef = useRef(strings)
+  useEffect(() => { stringsRef.current = strings }, [strings])
+
+  const { isListening, pitch, error, start, stop } = usePitchDetector(settingsRef, stringsRef)
   const { playNote } = useOscillator()
   const { beep } = useSuccessBeep()
 
