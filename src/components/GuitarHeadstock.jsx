@@ -124,7 +124,6 @@ export default function GuitarHeadstock({
   const nutY = hs.y + hs.h
 
   const bgColor    = dark ? '#09090b' : '#f4f4f5'
-  const dotColor   = dark ? '#27272a' : '#d4d4d8'
   const labelColor = dark ? '#ffffff' : '#3f3f46'
 
   return (
@@ -132,10 +131,6 @@ export default function GuitarHeadstock({
       <svg viewBox={viewBox} className="w-full" style={{ maxWidth: 300 }}
            aria-label="Guitar headstock tuner">
         <defs>
-          <pattern id="dotgrid" width="14" height="14" patternUnits="userSpaceOnUse">
-            <circle cx="7" cy="7" r="0.7" fill={dotColor} />
-          </pattern>
-
           {/* Maple headstock — dark: softened honey; light: bleached natural maple */}
           <linearGradient id="wood-h" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%"   stopColor={dark ? "#5e3f1c" : "#ddcfb4"} />
@@ -220,9 +215,7 @@ export default function GuitarHeadstock({
           </filter>
         </defs>
 
-        {/* Background */}
-        <rect width="300" height={svgH} fill={bgColor} />
-        <rect width="300" height={svgH} fill="url(#dotgrid)" />
+        {/* Transparent — the panel's blueprint grid shows through */}
 
         {/* Headstock body — layered maple wood */}
         <rect x={hs.x} y={hs.y} width={hs.w} height={hs.h} rx={hs.rx}
