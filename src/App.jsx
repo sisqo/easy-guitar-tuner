@@ -8,8 +8,6 @@ import { useInstallPrompt } from './hooks/useInstallPrompt'
 import { getTunings } from './data/tunings'
 import { findClosestString, freqToNoteName, getCents, isInTune } from './utils/noteUtils'
 import HamburgerMenu from './components/HamburgerMenu'
-import InstrumentTabs from './components/InstrumentTabs'
-import TuningSelector from './components/TuningSelector'
 import TunerBar from './components/TunerBar'
 import GuitarHeadstock from './components/GuitarHeadstock'
 import MicButton from './components/MicButton'
@@ -31,25 +29,26 @@ function AutoToggle({ lockedStringId, activeStringId, strings, onToggle }) {
     <button
       onClick={handleClick}
       aria-label={isLocked ? `Locked to ${lockedString?.label ?? 'string'} — tap to switch to Auto` : 'Auto mode — tap a string or here to lock'}
-      className={`shrink-0 flex items-center gap-1.5 px-3 rounded-lg border font-medium transition-colors cursor-pointer ${
+      className={`group relative h-14 px-5 rounded-full flex items-center gap-2 shrink-0 font-semibold text-sm border transition-all duration-200 ease-out active:scale-[0.97] cursor-pointer ${
         isLocked
-          ? 'bg-sky-50 border-sky-200 text-sky-700 dark:bg-sky-950/60 dark:border-sky-800 dark:text-sky-300'
-          : 'bg-zinc-100 border-zinc-200 text-zinc-500 hover:border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700/80 dark:text-zinc-400 dark:hover:border-zinc-600'
+          ? 'bg-gradient-to-b from-sky-50 to-sky-100 border-sky-200 text-sky-700 dark:from-sky-950/70 dark:to-sky-950/40 dark:border-sky-800/80 dark:text-sky-300'
+          : 'bg-gradient-to-b from-zinc-100 to-zinc-200 border-zinc-300 text-zinc-600 hover:from-white hover:to-zinc-100 dark:from-zinc-700 dark:to-zinc-800 dark:border-zinc-600/80 dark:text-zinc-300 dark:hover:from-zinc-600 dark:hover:to-zinc-700'
       }`}
-      style={{ fontSize: '12px', height: '36px' }}
     >
+      {/* Top sheen — matches the mic button's glassy cap */}
+      <span className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-b from-white/20 to-transparent" />
       {isLocked ? (
         <>
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+          <svg xmlns="http://www.w3.org/2000/svg" className="relative w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
           </svg>
-          <span className="font-semibold">{lockedString?.label ?? '—'}</span>
+          <span className="relative">{lockedString?.label ?? '—'}</span>
         </>
       ) : (
         <>
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-          <span>Auto</span>
+          <span className="relative w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+          <span className="relative">Auto</span>
         </>
       )}
     </button>
@@ -84,6 +83,10 @@ export default function App() {
   const instrumentData = allTunings[instrument]
   const safeTuningKey = instrumentData.tunings[tuningKey] ? tuningKey : 'standard'
   const strings = instrumentData.tunings[safeTuningKey].strings
+  const instrumentOptions = useMemo(
+    () => Object.entries(allTunings).map(([id, d]) => ({ id, label: d.label })),
+    [allTunings],
+  )
 
   // Keep a ref so the RAF loop can do string-aware octave correction without restart
   const stringsRef = useRef(strings)
@@ -174,7 +177,7 @@ export default function App() {
             : 'radial-gradient(115% 50% at 50% -8%, rgba(255,255,255,0.7), transparent 55%)',
         }}
       />
-      <header className="relative z-10 flex items-center justify-center px-4 py-3 border-b border-zinc-200/80 dark:border-zinc-800/80">
+      <header className="relative z-20 flex items-center justify-center px-4 py-3 border-b border-zinc-200/80 dark:border-zinc-800/80">
         <div className="flex items-center gap-4">
           <img src="/logo.png" alt="" className="w-10 h-10 rounded-xl" />
           <div>
@@ -191,19 +194,20 @@ export default function App() {
             onOpenSettings={() => setSettingsOpen(true)}
             showInstallOption={showInstallOption}
             onInstall={handleInstall}
+            instrument={instrument}
+            instruments={instrumentOptions}
+            onInstrumentChange={handleInstrumentChange}
+            tuningKey={safeTuningKey}
+            tunings={instrumentData.tunings}
+            onTuningChange={handleTuningChange}
           />
         </div>
       </header>
 
       <main className="relative z-10 flex-1 flex flex-col gap-3 px-4 py-3 max-w-lg mx-auto w-full">
-        {/* Compact selector row + Auto toggle */}
-        <div className="flex gap-2 items-center">
-          <InstrumentTabs active={instrument} onChange={handleInstrumentChange} />
-          <TuningSelector
-            tunings={instrumentData.tunings}
-            active={safeTuningKey}
-            onChange={handleTuningChange}
-          />
+        {/* Primary controls — mic + auto, side by side and harmonised */}
+        <div className="flex items-center justify-center gap-3 py-1">
+          <MicButton listening={isListening} onStart={start} onStop={handleStop} />
           <AutoToggle
             lockedStringId={lockedStringId}
             activeStringId={activeStringId}
@@ -211,11 +215,13 @@ export default function App() {
             onToggle={handleLockToggle}
           />
         </div>
-
-        {/* Mic button — primary action */}
-        <div className="flex justify-center py-1">
-          <MicButton listening={isListening} error={error} onStart={start} onStop={handleStop} />
-        </div>
+        {error && (
+          <p className="-mt-1 text-center text-xs text-red-500 dark:text-red-400 leading-snug">
+            {error === 'Microphone access denied.'
+              ? 'Mic access denied. Allow it in browser settings and try again.'
+              : error}
+          </p>
+        )}
 
         {/* Tuner bar */}
         <div className="rounded-2xl bg-white border border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800 px-5 py-4">

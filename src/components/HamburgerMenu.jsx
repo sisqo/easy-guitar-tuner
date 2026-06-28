@@ -1,12 +1,39 @@
 import { useState, useRef, useEffect } from 'react'
 
-export default function HamburgerMenu({ dark, onToggleTheme, onOpenSettings, showInstallOption, onInstall }) {
+function MenuSelect({ label, value, onChange, children }) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">{label}</span>
+      <div className="relative">
+        <select
+          value={value}
+          onChange={onChange}
+          aria-label={label}
+          className="appearance-none w-full h-9 bg-zinc-100 dark:bg-zinc-700/50 text-zinc-800 dark:text-zinc-100 rounded-lg pl-3 pr-8 border border-zinc-200 dark:border-zinc-600/70 hover:border-zinc-300 dark:hover:border-zinc-500 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500 cursor-pointer text-sm font-medium transition-colors"
+        >
+          {children}
+        </select>
+        <svg className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400"
+          viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
+        </svg>
+      </div>
+    </label>
+  )
+}
+
+export default function HamburgerMenu({
+  dark, onToggleTheme, onOpenSettings, showInstallOption, onInstall,
+  instrument, instruments, onInstrumentChange, tuningKey, tunings, onTuningChange,
+}) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
 
   useEffect(() => {
     if (!open) return
     function handleClick(e) {
+      // Don't close while interacting with the native selects inside the menu
+      if (e.target?.closest?.('select') || e.target?.tagName === 'OPTION') return
       if (ref.current && !ref.current.contains(e.target)) setOpen(false)
     }
     document.addEventListener('mousedown', handleClick)
@@ -35,7 +62,19 @@ export default function HamburgerMenu({ dark, onToggleTheme, onOpenSettings, sho
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-52 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 shadow-lg shadow-black/10 dark:shadow-black/40 overflow-hidden z-50">
+        <div className="absolute right-0 top-full mt-2 w-64 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 shadow-lg shadow-black/10 dark:shadow-black/40 overflow-hidden z-50">
+          {/* Instrument + tuning selection */}
+          <div className="px-3 pt-3 pb-3 flex flex-col gap-2.5">
+            <MenuSelect label="Instrument" value={instrument} onChange={e => onInstrumentChange(e.target.value)}>
+              {instruments.map(i => <option key={i.id} value={i.id}>{i.label}</option>)}
+            </MenuSelect>
+            <MenuSelect label="Tuning" value={tuningKey} onChange={e => onTuningChange(e.target.value)}>
+              {Object.entries(tunings).map(([key, t]) => <option key={key} value={key}>{t.label}</option>)}
+            </MenuSelect>
+          </div>
+
+          <div className="h-px bg-zinc-100 dark:bg-zinc-700" />
+
           <button
             onClick={handleTheme}
             className="flex items-center gap-3 w-full px-4 py-3 text-sm text-left text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700/60 transition-colors"
