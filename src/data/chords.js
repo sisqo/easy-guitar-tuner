@@ -30,6 +30,9 @@ export const getSuffixes = (db, root) => getChordsForRoot(db, root).map((c) => c
 export const getChord = (db, root, suffix) =>
   getChordsForRoot(db, root).find((c) => c.suffix === suffix) ?? null
 
+export const getPosition = (db, root, suffix, posIndex) =>
+  getChord(db, root, suffix)?.positions?.[posIndex] ?? null
+
 // Standard chord name: C / Cm / Cmaj7 / C7 …
 export function chordName(root, suffix) {
   if (suffix === 'major') return root
