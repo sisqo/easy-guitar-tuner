@@ -12,6 +12,7 @@ import TunerBar from './components/TunerBar'
 import GuitarHeadstock from './components/GuitarHeadstock'
 import MicButton from './components/MicButton'
 import SettingsPanel from './components/SettingsPanel'
+import ChordsView from './components/ChordsView'
 
 function AutoToggle({ lockedStringId, activeStringId, strings, onToggle }) {
   const isLocked = lockedStringId !== null
@@ -63,6 +64,10 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [tunedStrings, setTunedStrings] = useState(() => new Set())
   const [iosSheetOpen, setIosSheetOpen] = useState(false)
+  // Chords section — view always opens on the tuner; chord selection persists for the session
+  const [view, setView] = useState('tuner')
+  const [chordRoot, setChordRoot] = useState('C')
+  const [chordSuffix, setChordSuffix] = useState('major')
 
   const { canInstall, isIOS, showInstallOption, install } = useInstallPrompt()
 
@@ -93,8 +98,19 @@ export default function App() {
   useEffect(() => { stringsRef.current = strings }, [strings])
 
   const { isListening, pitch, error, start, stop } = usePitchDetector(settingsRef, stringsRef)
-  const { playNote } = useOscillator()
+  const { playNote, playChord } = useOscillator()
   const { beep } = useSuccessBeep()
+
+  const handleStop = useCallback(() => {
+    stop()
+    setTunedStrings(new Set())
+  }, [stop])
+
+  // Switching to Chords stops the mic (you're not tuning) to save battery
+  const handleViewChange = useCallback((v) => {
+    setView(v)
+    if (v === 'chords' && isListening) handleStop()
+  }, [isListening, handleStop])
 
   function handleInstrumentChange(id) {
     setInstrument(id)
@@ -110,10 +126,6 @@ export default function App() {
   function handleLockToggle(stringId) {
     setLockedStringId(prev => prev === stringId ? null : stringId)
   }
-  const handleStop = useCallback(() => {
-    stop()
-    setTunedStrings(new Set())
-  }, [stop])
 
   function handleInstall() {
     if (canInstall) {
@@ -200,11 +212,26 @@ export default function App() {
             tuningKey={safeTuningKey}
             tunings={instrumentData.tunings}
             onTuningChange={handleTuningChange}
+            view={view}
+            onViewChange={handleViewChange}
           />
         </div>
       </header>
 
       <main className="relative z-10 flex-1 flex flex-col gap-3 px-4 py-3 max-w-lg mx-auto w-full">
+        {view === 'chords' ? (
+          <ChordsView
+            instrument={instrument}
+            diapason={settings.diapason}
+            dark={dark}
+            playChord={playChord}
+            root={chordRoot}
+            suffix={chordSuffix}
+            onRootChange={setChordRoot}
+            onSuffixChange={setChordSuffix}
+          />
+        ) : (
+        <>
         {/* Primary controls — mic + auto, side by side and harmonised */}
         <div className="flex items-center justify-center gap-3 py-1">
           <MicButton listening={isListening} onStart={start} onStop={handleStop} />
@@ -263,6 +290,8 @@ export default function App() {
             tunedStrings={tunedStrings}
           />
         </div>
+        </>
+        )}
       </main>
 
       <footer className="text-center text-xs text-zinc-400 dark:text-zinc-700 py-3">

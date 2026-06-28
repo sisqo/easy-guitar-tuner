@@ -25,9 +25,12 @@ function MenuSelect({ label, value, onChange, children }) {
 export default function HamburgerMenu({
   dark, onToggleTheme, onOpenSettings, showInstallOption, onInstall,
   instrument, instruments, onInstrumentChange, tuningKey, tunings, onTuningChange,
+  view, onViewChange,
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
+
+  function pickView(v) { setOpen(false); onViewChange(v) }
 
   useEffect(() => {
     if (!open) return
@@ -63,14 +66,32 @@ export default function HamburgerMenu({
 
       {open && (
         <div className="absolute right-0 top-full mt-2 w-64 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 shadow-lg shadow-black/10 dark:shadow-black/40 overflow-hidden z-50">
-          {/* Instrument + tuning selection */}
-          <div className="px-3 pt-3 pb-3 flex flex-col gap-2.5">
+          {/* View switch — Tuner | Chords */}
+          <div className="px-3 pt-3 pb-2">
+            <div className="flex p-1 gap-1 rounded-lg bg-zinc-100 dark:bg-zinc-700/40">
+              {[['tuner', 'Tuner'], ['chords', 'Chords']].map(([v, label]) => (
+                <button key={v} onClick={() => pickView(v)}
+                  className={`flex-1 h-8 rounded-md text-sm font-semibold transition-colors ${
+                    view === v
+                      ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-zinc-100'
+                      : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
+                  }`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Instrument (+ tuning, only for the tuner) */}
+          <div className="px-3 pt-1 pb-3 flex flex-col gap-2.5">
             <MenuSelect label="Instrument" value={instrument} onChange={e => onInstrumentChange(e.target.value)}>
               {instruments.map(i => <option key={i.id} value={i.id}>{i.label}</option>)}
             </MenuSelect>
-            <MenuSelect label="Tuning" value={tuningKey} onChange={e => onTuningChange(e.target.value)}>
-              {Object.entries(tunings).map(([key, t]) => <option key={key} value={key}>{t.label}</option>)}
-            </MenuSelect>
+            {view !== 'chords' && (
+              <MenuSelect label="Tuning" value={tuningKey} onChange={e => onTuningChange(e.target.value)}>
+                {Object.entries(tunings).map(([key, t]) => <option key={key} value={key}>{t.label}</option>)}
+              </MenuSelect>
+            )}
           </div>
 
           <div className="h-px bg-zinc-100 dark:bg-zinc-700" />
