@@ -177,7 +177,7 @@ export default function App() {
             : 'radial-gradient(115% 50% at 50% -8%, rgba(255,255,255,0.7), transparent 55%)',
         }}
       />
-      <header className="relative z-20 flex items-center justify-center px-4 py-3 border-b border-zinc-200/80 dark:border-zinc-800/80">
+      <header className="relative z-20 flex items-center justify-center px-4 py-3">
         <div className="flex items-center gap-4">
           <img src="/logo.png" alt="" className="w-10 h-10 rounded-xl" />
           <div>
@@ -223,38 +223,46 @@ export default function App() {
           </p>
         )}
 
-        {/* Tuner bar */}
-        <div className="rounded-2xl bg-white border border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800 px-5 py-4">
-          {!isListening && !displayNote ? (
-            <div className="flex flex-col items-center justify-center py-2 gap-1">
-              <span className="text-6xl font-bold leading-none tabular-nums text-zinc-200 dark:text-zinc-800 select-none">–</span>
-              <p className="text-sm text-zinc-400 dark:text-zinc-600 tracking-wide">Tap to start tuning</p>
-            </div>
-          ) : (
-            <TunerBar
-              cents={displayCents}
-              note={displayNote}
-              freq={pitch}
-              listening={isListening}
-              inTuneThreshold={settings.inTuneThreshold}
-              displaySmooth={settings.displaySmooth}
-            />
-          )}
-        </div>
+        {/* One tuner panel: readout + headstock on a single blueprint grid */}
+        <div
+          className="rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden"
+          style={{
+            backgroundColor: dark ? '#09090b' : '#f4f4f5',
+            backgroundImage: `linear-gradient(${dark ? 'rgba(255,255,255,0.05)' : 'rgba(24,24,32,0.05)'} 1px, transparent 1px), linear-gradient(90deg, ${dark ? 'rgba(255,255,255,0.05)' : 'rgba(24,24,32,0.05)'} 1px, transparent 1px)`,
+            backgroundSize: '24px 24px',
+          }}
+        >
+          <div className="px-5 pt-5 pb-2">
+            {!isListening && !displayNote ? (
+              <div className="flex flex-col items-center justify-center py-2 gap-1">
+                <span className="text-6xl font-bold leading-none tabular-nums text-zinc-200 dark:text-zinc-800 select-none">–</span>
+                <p className="text-sm text-zinc-400 dark:text-zinc-600 tracking-wide">Tap to start tuning</p>
+              </div>
+            ) : (
+              <TunerBar
+                cents={displayCents}
+                note={displayNote}
+                freq={pitch}
+                listening={isListening}
+                inTuneThreshold={settings.inTuneThreshold}
+                displaySmooth={settings.displaySmooth}
+              />
+            )}
+          </div>
 
-        {/* Headstock */}
-        <GuitarHeadstock
-          strings={strings}
-          activeStringId={activeStringId}
-          activeFreq={activeFreq}
-          lockedStringId={lockedStringId}
-          activeCents={activeCents}
-          onStringSelect={handleLockToggle}
-          onPlay={playNote}
-          dark={dark}
-          inTuneThreshold={settings.inTuneThreshold}
-          tunedStrings={tunedStrings}
-        />
+          <GuitarHeadstock
+            strings={strings}
+            activeStringId={activeStringId}
+            activeFreq={activeFreq}
+            lockedStringId={lockedStringId}
+            activeCents={activeCents}
+            onStringSelect={handleLockToggle}
+            onPlay={playNote}
+            dark={dark}
+            inTuneThreshold={settings.inTuneThreshold}
+            tunedStrings={tunedStrings}
+          />
+        </div>
       </main>
 
       <footer className="text-center text-xs text-zinc-400 dark:text-zinc-700 py-3">
