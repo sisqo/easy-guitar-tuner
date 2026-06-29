@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-color",
+        "value": "rgba(255,255,255,0.7)",
+        "reason": "Wood gloss highlight in headstock SVG — intentional radial gradient effect, not a design-system color",
+        "createdAt": "2026-06-29T19:49:57.775Z"
+      }
+    ]
+  }
+}
