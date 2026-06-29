@@ -294,8 +294,8 @@ export default function App() {
         )}
       </main>
 
-      <footer className="text-center text-xs text-zinc-500/60 dark:text-zinc-600/60 py-3 tracking-wide">
-        by SisQo &nbsp;·&nbsp; <span className="font-mono opacity-70">{__BUILD_HASH__}</span>
+      <footer className="text-center text-sm text-zinc-500/80 dark:text-zinc-500/60 py-3 tracking-wide">
+        by SisQo &nbsp;·&nbsp; <span className="font-mono">{__BUILD_HASH__}</span>
       </footer>
 
       <SettingsPanel
