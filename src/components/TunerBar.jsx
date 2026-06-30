@@ -95,7 +95,7 @@ export default function TunerBar({ cents, note, freq, inTuneThreshold = 5, displ
       <div className="flex justify-between text-xs text-zinc-400 dark:text-zinc-600 px-0.5">
         <span className={isFlat ? 'text-sky-500 font-medium' : ''}>−10</span>
         <span className={`font-semibold tracking-wide ${inTune ? 'text-emerald-500' : ''}`}>
-          {inTune ? '✓ IN TUNE' : 'TUNE'}
+          {inTune ? '✓ IN TUNE' : isFlat ? '▲ tune up' : '▼ tune down'}
         </span>
         <span className={isSharp ? 'text-amber-500 font-medium' : ''}>+10</span>
       </div>
