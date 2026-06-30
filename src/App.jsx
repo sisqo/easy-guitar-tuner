@@ -58,7 +58,7 @@ function AutoToggle({ lockedStringId, activeStringId, strings, onToggle }) {
 }
 
 export default function App() {
-  const [dark, setDark] = useLocalStorage('egt-dark', true)
+  const [dark, setDark] = useLocalStorage('egt-dark', window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? true)
   const [instrument, setInstrument] = useLocalStorage('egt-instrument', 'guitar6')
   const [tuningKey, setTuningKey] = useLocalStorage('egt-tuning', 'standard')
   const [lockedStringId, setLockedStringId] = useState(null)
@@ -194,7 +194,7 @@ export default function App() {
         <div className="flex items-center gap-4">
           <img src="/logo.png" alt="" className="w-10 h-10 rounded-xl" />
           <div>
-            <h1 className="text-lg font-bold tracking-tight text-zinc-900 dark:text-zinc-100 leading-none">
+            <h1 className="text-lg font-bold tracking-tight text-zinc-900 dark:text-zinc-100 leading-none" aria-label="Easy Guitar Tuner">
               Easy<span style={{ color: '#2aab9e' }}>Guitar</span>Tuner
             </h1>
             <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5 tracking-wide">
