@@ -198,7 +198,7 @@ export default function App() {
               Easy<span style={{ color: '#2aab9e' }}>Guitar</span>Tuner
             </h1>
             <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5 tracking-wide">
-              {instrumentData.label} · {instrumentData.tunings[safeTuningKey].label.split('(')[0].trim()}
+              {instrumentData.tunings[safeTuningKey].label.split('(')[0].trim()}
             </p>
           </div>
         </div>
