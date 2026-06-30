@@ -313,6 +313,21 @@ export default function App() {
         )}
       </main>
 
+      <div className="flex justify-center pb-4">
+        <a
+          href="https://ko-fi.com/sisqo"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-semibold transition-opacity hover:opacity-90 active:opacity-75"
+          style={{ backgroundColor: '#FF5E5B' }}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M2 3h18.5a1.5 1.5 0 0 1 0 3H19l-1.5 13A2 2 0 0 1 15.5 21h-7a2 2 0 0 1-2-1.8L5 7H2V3zm7.5 5a.75.75 0 0 0-.75.75v5.5a.75.75 0 0 0 1.5 0v-5.5A.75.75 0 0 0 9.5 8zm3.5 0a.75.75 0 0 0-.75.75v5.5a.75.75 0 0 0 1.5 0v-5.5A.75.75 0 0 0 13 8z"/>
+          </svg>
+          Buy me a coffee
+        </a>
+      </div>
+
       <footer className="text-center text-sm text-zinc-500/80 dark:text-zinc-500/60 py-3 tracking-wide">
         by <a href="https://www.sisqo.dev" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-700 dark:hover:text-zinc-400 transition-colors">SisQo</a> &nbsp;·&nbsp; <span className="font-mono">{__BUILD_HASH__}</span>
       </footer>
