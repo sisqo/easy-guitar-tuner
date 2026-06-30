@@ -59,7 +59,7 @@ function AutoToggle({ lockedStringId, activeStringId, strings, onToggle }) {
 }
 
 export default function App() {
-  const [dark, setDark] = useLocalStorage('egt-dark', window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? true)
+  const [dark, setDark] = useLocalStorage('egt-dark', true)
   const [instrument, setInstrument] = useLocalStorage('egt-instrument', 'guitar6')
   const [tuningKey, setTuningKey] = useLocalStorage('egt-tuning', 'standard')
   const [lockedStringId, setLockedStringId] = useState(null)
