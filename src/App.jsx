@@ -314,7 +314,7 @@ export default function App() {
       </main>
 
       <footer className="text-center text-sm text-zinc-500/80 dark:text-zinc-500/60 py-3 tracking-wide">
-        by SisQo &nbsp;·&nbsp; <span className="font-mono">{__BUILD_HASH__}</span>
+        by <a href="https://www.sisqo.dev" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-700 dark:hover:text-zinc-400 transition-colors">SisQo</a> &nbsp;·&nbsp; <span className="font-mono">{__BUILD_HASH__}</span>
       </footer>
 
       <SettingsPanel
