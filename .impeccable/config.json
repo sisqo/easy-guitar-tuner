@@ -11,8 +11,8 @@
       },
       {
         "rule": "design-system-color",
-        "value": "#FF5E5B",
-        "reason": "Ko-fi official brand color, user confirmed intentional",
+        "value": "#72a4f2",
+        "reason": "Ko-fi widget color from user's Ko-fi account settings, intentional",
         "createdAt": "2026-06-30T00:00:00.000Z"
       }
     ]
