@@ -30,14 +30,15 @@ function AutoToggle({ lockedStringId, activeStringId, strings, onToggle }) {
     <button
       onClick={handleClick}
       aria-label={isLocked ? `Locked to ${lockedString?.label ?? 'string'} — tap to switch to Auto` : 'Auto mode — tap a string or here to lock'}
-      className={`group relative h-14 px-5 rounded-full flex items-center gap-2 shrink-0 font-semibold text-sm border transition-all duration-200 ease-out active:scale-[0.97] cursor-pointer ${
+      className={`group relative rounded-full flex items-center gap-2 shrink-0 border transition-all duration-200 ease-out active:scale-[0.97] cursor-pointer ${
         isLocked
-          ? 'bg-gradient-to-b from-sky-50 to-sky-100 border-sky-200 text-sky-700 dark:from-sky-950/70 dark:to-sky-950/40 dark:border-sky-800/80 dark:text-sky-300'
-          : 'bg-gradient-to-b from-zinc-100 to-zinc-200 border-zinc-300 text-zinc-600 hover:from-white hover:to-zinc-100 dark:from-zinc-700 dark:to-zinc-800 dark:border-zinc-600/80 dark:text-zinc-300 dark:hover:from-zinc-600 dark:hover:to-zinc-700'
+          ? 'h-11 px-4 font-semibold text-sm bg-gradient-to-b from-sky-50 to-sky-100 border-sky-200 text-sky-700 dark:from-sky-950/70 dark:to-sky-950/40 dark:border-sky-800/80 dark:text-sky-300'
+          : 'h-9 px-3 font-medium text-xs border-zinc-200 text-zinc-400 dark:border-zinc-700 dark:text-zinc-600 hover:border-zinc-300 hover:text-zinc-500 dark:hover:border-zinc-600 dark:hover:text-zinc-500'
       }`}
     >
-      {/* Top sheen — matches the mic button's glassy cap */}
-      <span className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-b from-white/20 to-transparent" />
+      {isLocked && (
+        <span className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-b from-white/20 to-transparent" />
+      )}
       {isLocked ? (
         <>
           <svg xmlns="http://www.w3.org/2000/svg" className="relative w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
@@ -48,8 +49,8 @@ function AutoToggle({ lockedStringId, activeStringId, strings, onToggle }) {
         </>
       ) : (
         <>
-          <span className="relative w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-          <span className="relative">Auto</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/70 shrink-0" />
+          <span>Auto detect</span>
         </>
       )}
     </button>
@@ -196,7 +197,9 @@ export default function App() {
             <h1 className="text-lg font-bold tracking-tight text-zinc-900 dark:text-zinc-100 leading-none">
               Easy<span style={{ color: '#2aab9e' }}>Guitar</span>Tuner
             </h1>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 tracking-wide">Chromatic tuner</p>
+            <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5 tracking-wide">
+              {instrumentData.label} · {instrumentData.tunings[safeTuningKey].label.split('(')[0].trim()}
+            </p>
           </div>
         </div>
         <div className="absolute right-4 top-1/2 -translate-y-1/2">
@@ -246,7 +249,7 @@ export default function App() {
           <p className="-mt-1 text-center text-xs text-red-500 dark:text-red-400 leading-snug">
             {error === 'Microphone access denied.'
               ? 'Mic access denied. Allow it in browser settings and try again.'
-              : error}
+              : <>{error}{' '}<button onClick={() => window.location.reload()} className="underline underline-offset-2 cursor-pointer">Reload the page</button></>}
           </p>
         )}
 
@@ -276,6 +279,22 @@ export default function App() {
               />
             )}
           </div>
+
+          {isListening && tunedStrings.size > 0 && (
+            <div className="px-5 pb-2 flex items-center gap-2">
+              <div className="flex gap-1">
+                {strings.map(s => (
+                  <span
+                    key={s.id}
+                    className={`w-1.5 h-1.5 rounded-full transition-colors duration-300 ${tunedStrings.has(s.id) ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-700'}`}
+                  />
+                ))}
+              </div>
+              <span className="text-[10px] text-zinc-400 dark:text-zinc-600 tabular-nums">
+                {tunedStrings.size}/{strings.length}
+              </span>
+            </div>
+          )}
 
           <GuitarHeadstock
             strings={strings}
