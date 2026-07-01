@@ -1,28 +1,24 @@
-import { useRef } from 'react'
 import { isInTune } from '../utils/noteUtils'
 
 const CENTS_RANGE = 50
 const TICKS = [-50, -25, 0, 25, 50]
 
 export default function TunerBar({ cents, note, freq, inTuneThreshold = 5, displaySmooth = 0.12 }) {
-  const displayCentsRef = useRef(0)
-
-  if (note) {
-    displayCentsRef.current = displayCentsRef.current * (1 - displaySmooth) + (cents ?? 0) * displaySmooth
-  } else {
-    displayCentsRef.current = 0
-  }
-  const displayCents = displayCentsRef.current
+  // Needle smoothing is purely visual: a CSS `left` transition retargeted every frame.
+  // Duration maps the displaySmooth EMA alpha to its per-frame time constant, so the
+  // number, color, arrows and needle all derive from the same raw cents value.
+  const needleMs = Math.round(16.7 * (1 / displaySmooth - 1))
+  const displayCents = note ? (cents ?? 0) : 0
 
   const clampedCents = Math.max(-CENTS_RANGE, Math.min(CENTS_RANGE, displayCents))
   const pct = ((clampedCents + CENTS_RANGE) / (CENTS_RANGE * 2)) * 100
-  const inTune = note && isInTune(cents ?? 0, inTuneThreshold)
+  const inTune = note && isInTune(displayCents, inTuneThreshold)
   const hasSignal = note !== null && note !== undefined
   const isSharp = hasSignal && !inTune && displayCents > 0
   const isFlat  = hasSignal && !inTune && displayCents < 0
 
   // -10 … +10 display scale (50 cents → 10 units)
-  const rawUnit = (cents ?? 0) / 5
+  const rawUnit = displayCents / 5
   const displayUnit = Math.max(-10, Math.min(10, Math.round(rawUnit)))
 
   const sig = !hasSignal ? 'zinc' : inTune ? 'emerald' : isSharp ? 'amber' : 'sky'
@@ -86,8 +82,13 @@ export default function TunerBar({ cents, note, freq, inTuneThreshold = 5, displ
 
         {/* Indicator dot — glows in its signal color */}
         <div
-          className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full z-20 transition-[background-color,box-shadow] duration-75 ring-1 ring-black/10 dark:ring-white/20"
-          style={{ left: `calc(${pct}% - 7px)`, backgroundColor: indicatorBg, boxShadow: indicatorGlow }}
+          className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full z-20 ring-1 ring-black/10 dark:ring-white/20"
+          style={{
+            left: `calc(${pct}% - 7px)`,
+            backgroundColor: indicatorBg,
+            boxShadow: indicatorGlow,
+            transition: `background-color 75ms, box-shadow 75ms, left ${needleMs}ms linear`,
+          }}
         />
       </div>
 

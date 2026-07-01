@@ -114,7 +114,7 @@ export default function SettingsPanel({ open, onClose, settings, update, resetAl
               value={settings.displaySmooth} min={0.05} max={0.40} step={0.01}
               format={v => v.toFixed(2)}
               description="Needle fluidity"
-              info="Controls how fluidly the needle moves. Lower values react faster but may feel jittery; higher values are smoother but slower to follow pitch changes."
+              info="Controls how fluidly the needle moves. Higher values react faster but may feel jittery; lower values are smoother but slower to follow pitch changes."
               update={update}
             />
           </section>
@@ -151,7 +151,7 @@ export default function SettingsPanel({ open, onClose, settings, update, resetAl
                 value={settings.smoothFactor} min={0.05} max={0.50} step={0.01}
                 format={v => v.toFixed(2)}
                 description="Pitch reactivity"
-                info="Smoothing applied to the raw pitch signal between frames. Lower = faster and more reactive; higher = smoother but slower to follow rapid pitch changes."
+                info="Smoothing applied to the raw pitch signal between frames. Higher = faster and more reactive; lower = smoother but slower to follow rapid pitch changes."
                 update={update}
               />
               <Slider
@@ -166,7 +166,7 @@ export default function SettingsPanel({ open, onClose, settings, update, resetAl
                 label="Outlier gate" settingKey="rejectThreshold"
                 value={settings.rejectThreshold} min={10} max={80} step={5}
                 format={v => `${v} ¢`}
-                description="Discard small jumps"
+                description="Discard sudden jumps"
                 info="Pitch jumps larger than this value between consecutive frames are discarded as noise. Helps reject string buzz, fret rattle, and sudden detection spikes."
                 update={update}
               />

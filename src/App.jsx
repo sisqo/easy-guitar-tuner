@@ -15,6 +15,9 @@ import SettingsPanel from './components/SettingsPanel'
 import ChordsView from './components/ChordsView'
 import KofiButton from './components/KofiButton'
 
+// How long the pitch must stay inside the in-tune zone before the success beep fires
+const IN_TUNE_BEEP_MS = 1500
+
 function AutoToggle({ lockedStringId, activeStringId, strings, onToggle }) {
   const isLocked = lockedStringId !== null
   const lockedString = isLocked ? strings.find(s => s.id === lockedStringId) : null
@@ -163,7 +166,7 @@ export default function App() {
     if (isInTune(displayCents, settings.inTuneThreshold) && displayNote) {
       if (inTuneStartRef.current === null) {
         inTuneStartRef.current = Date.now()
-      } else if (Date.now() - inTuneStartRef.current >= 1500 && !beepFiredRef.current) {
+      } else if (Date.now() - inTuneStartRef.current >= IN_TUNE_BEEP_MS && !beepFiredRef.current) {
         beep()
         beepFiredRef.current = true
         if (activeStringId !== null) {
@@ -177,7 +180,7 @@ export default function App() {
       inTuneStartRef.current = null
       beepFiredRef.current = false
     }
-  }, [displayCents, displayNote, beep, settings.inTuneThreshold, activeStringId])
+  }, [displayCents, displayNote, beep, settings.inTuneThreshold, activeStringId, strings])
 
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 flex flex-col">

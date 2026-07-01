@@ -80,7 +80,10 @@ export function usePitchDetector(settingsRef, stringsRef) {
 
       setIsListening(true)
 
-      const MIN_FREQ = 70
+      // 60 clears Drop C's low C2 (65.41 Hz @ A440, 64.2 @ A432) with headroom for
+      // slack strings being tuned up; 50/60 Hz mains hum stays rejected in practice
+      // by the RMS noise gate + clarity threshold.
+      const MIN_FREQ = 60
       const MAX_FREQ = 660
 
       const loop = () => {
