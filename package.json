@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@tombatossals/chords-db": "^0.5.1",
+    "@vercel/analytics": "^2.0.1",
     "pitchy": "^4.1.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
