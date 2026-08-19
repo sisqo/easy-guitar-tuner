@@ -1,13 +1,25 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
 import { PitchDetector } from 'pitchy'
-import { SETTINGS_DEFAULTS } from './useSettings'
+import { SETTINGS_DEFAULTS } from '../data/settings'
+import { createTrackerState, trackPitch, cents } from '../utils/pitchTracker'
 
-// Try ÷2, ×1, ×2 and pick whichever is nearest to reference (single octave correction)
-function nearestOctave(detected, reference, minFreq, maxFreq) {
-  const candidates = [detected / 2, detected, detected * 2].filter(p => p >= minFreq && p <= maxFreq)
-  return candidates.reduce((best, p) =>
-    Math.abs(Math.log2(p / reference)) < Math.abs(Math.log2(best / reference)) ? p : best
-  )
+// A 4096-sample window at 48 kHz turns over every 85 ms, so consecutive analyses
+// share ~80% of their samples — running the detector once per animation frame is
+// mostly redundant FFT work. 30 ms keeps all the independent information the
+// analyser can actually give while leaving the main thread to the UI.
+const ANALYSIS_INTERVAL_MS = 30
+
+// Republish only once the reading has really moved. A parked string then stops
+// re-rendering the tree altogether, instead of pushing a new float 60 times a
+// second and dragging the headstock SVG along with it.
+const PUBLISH_CENTS = 0.3
+
+const VALID_WINDOWS = [4096, 8192, 16384]
+
+function windowSizeOf(settings) {
+  return VALID_WINDOWS.includes(settings.windowSize)
+    ? settings.windowSize
+    : SETTINGS_DEFAULTS.windowSize
 }
 
 export function usePitchDetector(settingsRef, stringsRef) {
@@ -19,11 +31,16 @@ export function usePitchDetector(settingsRef, stringsRef) {
   const analyserRef = useRef(null)
   const sourceRef = useRef(null)
   const streamRef = useRef(null)
-  const detectorRef = useRef(null)
   const rafRef = useRef(null)
-  const bufferRef = useRef(null)
-  const smoothedPitchRef = useRef(null)
-  const lastValidAtRef = useRef(null)
+  const trackerRef = useRef(createTrackerState())
+
+  // Read by DebugOverlay at its own pace. A ref, not state: the whole point of
+  // the instrumentation is that observing the detector must not change how often
+  // the app renders.
+  const statsRef = useRef({
+    rawHz: 0, clarity: 0, rms: 0, smoothedHz: null, gate: 'idle',
+    acceptedPerSec: 0, analysesPerSec: 0, windowSize: 0, sampleRate: 0,
+  })
 
   const stop = useCallback(() => {
     if (rafRef.current) {
@@ -42,8 +59,9 @@ export function usePitchDetector(settingsRef, stringsRef) {
       audioCtxRef.current.close()
       audioCtxRef.current = null
     }
-    smoothedPitchRef.current = null
-    lastValidAtRef.current = null
+    analyserRef.current = null
+    trackerRef.current = createTrackerState()
+    statsRef.current = { ...statsRef.current, gate: 'idle', smoothedHz: null, rawHz: 0, clarity: 0, rms: 0 }
     setIsListening(false)
     setPitch(null)
   }, [])
@@ -61,34 +79,84 @@ export function usePitchDetector(settingsRef, stringsRef) {
         try { navigator.audioSession.type = 'play-and-record' } catch { /* unsupported */ }
       }
       const ctx = new AudioContext()
+      const settings = settingsRef?.current ?? SETTINGS_DEFAULTS
+
+      let windowSize = windowSizeOf(settings)
       const analyser = ctx.createAnalyser()
-      analyser.fftSize = 4096
+      analyser.fftSize = windowSize
+      // No-op for getFloatTimeDomainData (it only smooths the frequency-domain
+      // reads), but it documents that nothing is averaged behind our back.
       analyser.smoothingTimeConstant = 0.0
 
+      // Wired once and never rewired: only the frequencies are live-adjustable, so
+      // changing a filter setting never has to tear down the AudioContext.
+      // The lowpass is the real defence against octave-up errors — it removes the
+      // upper partials that tempt MPM into picking the half-period peak. The
+      // highpass takes out handling rumble and DC, which otherwise inflate the RMS
+      // and make the noise gate meaningless.
+      const highpass = ctx.createBiquadFilter()
+      highpass.type = 'highpass'
+      highpass.frequency.value = settings.hpFreq
+      highpass.Q.value = 0.7
+
+      const lowpass = ctx.createBiquadFilter()
+      lowpass.type = 'lowpass'
+      lowpass.frequency.value = settings.lpFreq
+      lowpass.Q.value = 0.7
+
       const source = ctx.createMediaStreamSource(stream)
-      source.connect(analyser)
+      source.connect(highpass)
+      highpass.connect(lowpass)
+      lowpass.connect(analyser)
       streamRef.current = stream
 
-      const detector = PitchDetector.forFloat32Array(analyser.fftSize)
-      const buffer = new Float32Array(detector.inputLength)
+      let detector = PitchDetector.forFloat32Array(windowSize)
+      let buffer = new Float32Array(detector.inputLength)
+      // pitchy exposes clarityThreshold as a setter with no getter, so the applied
+      // value has to be tracked here. It is MPM's k — which NSDF peak counts as the
+      // period — so it governs octave selection, unlike settings.clarityThreshold
+      // which only decides whether a finished reading is trusted.
+      let appliedK = null
 
       audioCtxRef.current = ctx
       analyserRef.current = analyser
       sourceRef.current = source
-      detectorRef.current = detector
-      bufferRef.current = buffer
+      trackerRef.current = createTrackerState()
 
       setIsListening(true)
 
-      // 60 clears Drop C's low C2 (65.41 Hz @ A440, 64.2 @ A432) with headroom for
-      // slack strings being tuned up; 50/60 Hz mains hum stays rejected in practice
-      // by the RMS noise gate + clarity threshold.
-      const MIN_FREQ = 60
-      const MAX_FREQ = 660
+      let lastAnalysisAt = 0
+      let published = null
+      let analyses = 0
+      let accepted = 0
+      let counterAt = performance.now()
 
       const loop = () => {
+        rafRef.current = requestAnimationFrame(loop)
+
         // Read latest settings on every frame — no restart needed
         const s = settingsRef?.current ?? SETTINGS_DEFAULTS
+        const now = performance.now()
+
+        if (highpass.frequency.value !== s.hpFreq) highpass.frequency.value = s.hpFreq
+        if (lowpass.frequency.value !== s.lpFreq) lowpass.frequency.value = s.lpFreq
+
+        if (now - lastAnalysisAt < ANALYSIS_INTERVAL_MS) return
+        lastAnalysisAt = now
+
+        const wanted = windowSizeOf(s)
+        if (wanted !== windowSize) {
+          windowSize = wanted
+          analyser.fftSize = windowSize
+          detector = PitchDetector.forFloat32Array(windowSize)
+          buffer = new Float32Array(detector.inputLength)
+          appliedK = null
+          trackerRef.current = createTrackerState()
+        }
+        if (s.mpmK !== appliedK) {
+          detector.clarityThreshold = s.mpmK
+          appliedK = s.mpmK
+        }
 
         analyser.getFloatTimeDomainData(buffer)
 
@@ -96,64 +164,47 @@ export function usePitchDetector(settingsRef, stringsRef) {
         for (let i = 0; i < buffer.length; i++) rms += buffer[i] * buffer[i]
         rms = Math.sqrt(rms / buffer.length)
 
+        let rawHz = 0
+        let clarity = 0
         if (rms >= s.noiseGate) {
-          const [detectedPitch, clarity] = detector.findPitch(buffer, ctx.sampleRate)
-          if (clarity >= s.clarityThreshold && detectedPitch >= MIN_FREQ && detectedPitch <= MAX_FREQ) {
-            const prev = smoothedPitchRef.current
-            if (prev === null) {
-              smoothedPitchRef.current = detectedPitch
-            } else {
-              const jumpCents = Math.abs(1200 * Math.log2(detectedPitch / prev))
-              if (jumpCents > s.resetThreshold) {
-                const strings = stringsRef?.current
-                let bestCandidate
-                if (strings && strings.length > 0) {
-                  // Prefer detected pitch on ties (detected-first + strict <) so that
-                  // on 12-string, playing E3 beats the ÷2=E2 candidate even though both
-                  // are 0 cents from a real string.
-                  const candidates = [detectedPitch, detectedPitch / 2, detectedPitch * 2]
-                    .filter(p => p >= MIN_FREQ && p <= MAX_FREQ)
-                  let minDist = Infinity
-                  bestCandidate = detectedPitch
-                  for (const candidate of candidates) {
-                    for (const s of strings) {
-                      const dist = Math.abs(1200 * Math.log2(candidate / s.freq))
-                      if (dist < minDist) { minDist = dist; bestCandidate = candidate }
-                    }
-                  }
-                } else {
-                  bestCandidate = nearestOctave(detectedPitch, prev, MIN_FREQ, MAX_FREQ)
-                }
-                const correctedJump = Math.abs(1200 * Math.log2(bestCandidate / prev))
-                if (correctedJump <= s.rejectThreshold) {
-                  smoothedPitchRef.current = prev * (1 - s.smoothFactor) + bestCandidate * s.smoothFactor
-                } else {
-                  smoothedPitchRef.current = detectedPitch
-                }
-              } else if (jumpCents > s.rejectThreshold) {
-                // outlier — discard
-              } else {
-                smoothedPitchRef.current = prev * (1 - s.smoothFactor) + detectedPitch * s.smoothFactor
-              }
-            }
-            lastValidAtRef.current = performance.now()
-            setPitch(smoothedPitchRef.current)
-          } else {
-            const elapsed = performance.now() - (lastValidAtRef.current ?? 0)
-            if (elapsed >= s.holdMs || smoothedPitchRef.current === null) {
-              smoothedPitchRef.current = null
-              setPitch(null)
-            }
-          }
-        } else {
-          const elapsed = performance.now() - (lastValidAtRef.current ?? 0)
-          if (elapsed >= s.holdMs || smoothedPitchRef.current === null) {
-            smoothedPitchRef.current = null
-            setPitch(null)
-          }
+          [rawHz, clarity] = detector.findPitch(buffer, ctx.sampleRate)
         }
 
-        rafRef.current = requestAnimationFrame(loop)
+        const { hz, gate } = trackPitch(
+          trackerRef.current,
+          { rawHz, clarity, rms, now, windowMs: (windowSize / ctx.sampleRate) * 1000 },
+          s,
+          stringsRef?.current ?? [],
+        )
+
+        if (hz === null) {
+          if (published !== null) {
+            published = null
+            setPitch(null)
+          }
+        } else if (published === null || Math.abs(cents(hz, published)) >= PUBLISH_CENTS) {
+          published = hz
+          setPitch(hz)
+        }
+
+        analyses++
+        if (gate === 'ok') accepted++
+        const stats = statsRef.current
+        stats.rawHz = rawHz
+        stats.clarity = clarity
+        stats.rms = rms
+        stats.smoothedHz = hz
+        stats.gate = gate
+        stats.windowSize = windowSize
+        stats.sampleRate = ctx.sampleRate
+        const span = now - counterAt
+        if (span >= 1000) {
+          stats.analysesPerSec = Math.round((analyses * 1000) / span)
+          stats.acceptedPerSec = Math.round((accepted * 1000) / span)
+          analyses = 0
+          accepted = 0
+          counterAt = now
+        }
       }
 
       rafRef.current = requestAnimationFrame(loop)
@@ -165,5 +216,5 @@ export function usePitchDetector(settingsRef, stringsRef) {
 
   useEffect(() => () => stop(), [stop])
 
-  return { isListening, pitch, error, start, stop }
+  return { isListening, pitch, error, start, stop, statsRef }
 }

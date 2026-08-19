@@ -1,25 +1,23 @@
-import { isInTune } from '../utils/noteUtils'
-
-const CENTS_RANGE = 50
-const TICKS = [-50, -25, 0, 25, 50]
-
-export default function TunerBar({ cents, note, freq, inTuneThreshold = 5, displaySmooth = 0.12 }) {
-  // Needle smoothing is purely visual: a CSS `left` transition retargeted every frame.
-  // Duration maps the displaySmooth EMA alpha to its per-frame time constant, so the
-  // number, color, arrows and needle all derive from the same raw cents value.
+export default function TunerBar({ cents, note, freq, inTune = false, zoneCents = 3, displaySmooth = 0.22, barRange = 25 }) {
+  // Needle smoothing is purely visual: a CSS `left` transition retargeted on every
+  // update. Duration maps the displaySmooth EMA alpha to its per-frame time
+  // constant, so the number, color, arrows and needle all derive from the same
+  // tracked pitch — the detector has already done the real smoothing. `inTune`
+  // arrives already latched from App, which is what also drives the headstock ring
+  // and the success beep, so the three can no longer disagree with each other.
   const needleMs = Math.round(16.7 * (1 / displaySmooth - 1))
-  const displayCents = note ? (cents ?? 0) : 0
-
-  const clampedCents = Math.max(-CENTS_RANGE, Math.min(CENTS_RANGE, displayCents))
-  const pct = ((clampedCents + CENTS_RANGE) / (CENTS_RANGE * 2)) * 100
-  const inTune = note && isInTune(displayCents, inTuneThreshold)
   const hasSignal = note !== null && note !== undefined
+  const displayCents = hasSignal ? (cents ?? 0) : 0
+
+  const clampedCents = Math.max(-barRange, Math.min(barRange, displayCents))
+  const pct = ((clampedCents + barRange) / (barRange * 2)) * 100
   const isSharp = hasSignal && !inTune && displayCents > 0
   const isFlat  = hasSignal && !inTune && displayCents < 0
 
-  // -10 … +10 display scale (50 cents → 10 units)
-  const rawUnit = displayCents / 5
-  const displayUnit = Math.max(-10, Math.min(10, Math.round(rawUnit)))
+  // Real cents, to the cent. The old ±10 scale rounded to 5-cent steps, so a
+  // string three cents out looked perfectly in tune.
+  const displayCentsInt = Math.round(displayCents)
+  const ticks = [-barRange, -Math.round(barRange / 2), 0, Math.round(barRange / 2), barRange]
 
   const sig = !hasSignal ? 'zinc' : inTune ? 'emerald' : isSharp ? 'amber' : 'sky'
   const indicatorBg = { zinc: '#a1a1aa', emerald: '#10b981', amber: '#fbbf24', sky: '#38bdf8' }[sig]
@@ -35,7 +33,7 @@ export default function TunerBar({ cents, note, freq, inTuneThreshold = 5, displ
 
   return (
     <div className="egt-enter flex flex-col gap-2.5">
-      {/* Note name + scaled value + frequency */}
+      {/* Note name + cents deviation + frequency */}
       <div className="flex items-end justify-center gap-3">
         <span className={`text-6xl font-bold tabular-nums leading-none transition-colors ${hasSignal ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-300 dark:text-zinc-700'}`}>
           {hasSignal ? note : '–'}
@@ -43,7 +41,8 @@ export default function TunerBar({ cents, note, freq, inTuneThreshold = 5, displ
         {hasSignal && (
           <div className="flex flex-col items-start mb-1 w-16">
             <span className={`text-lg font-semibold tabular-nums leading-none transition-colors ${unitColor}`}>
-              {displayUnit > 0 ? '+' : ''}{displayUnit}
+              {displayCentsInt > 0 ? '+' : ''}{displayCentsInt}
+              <span className="text-[11px] font-normal ml-0.5">¢</span>
             </span>
             {freq ? (
               <span className="text-[10px] text-zinc-400 dark:text-zinc-600 tabular-nums mt-1">
@@ -56,19 +55,20 @@ export default function TunerBar({ cents, note, freq, inTuneThreshold = 5, displ
 
       {/* Tuner bar */}
       <div className="relative h-4 rounded-full bg-zinc-200 dark:bg-zinc-800/80 overflow-hidden ring-1 ring-inset ring-black/5 dark:ring-white/5">
-        {/* In-tune zone: width and position derived from inTuneThreshold */}
+        {/* In-tune zone: drawn at the width the latched verdict is currently using,
+            so an emerald dot is always inside it */}
         <div
           className="absolute inset-y-0 rounded-[3px] bg-emerald-500/20 ring-1 ring-inset ring-emerald-500/30"
           style={{
-            width: `${(inTuneThreshold / CENTS_RANGE) * 100}%`,
-            left: `${50 - (inTuneThreshold / CENTS_RANGE) * 50}%`,
+            width: `${(zoneCents / barRange) * 100}%`,
+            left: `${50 - (zoneCents / barRange) * 50}%`,
           }}
         />
 
         {/* Tick marks */}
-        {TICKS.map(tick => {
+        {ticks.map(tick => {
           const isCenter = tick === 0
-          const pctPos = tick + 50
+          const pctPos = ((tick + barRange) / (barRange * 2)) * 100
           return (
             <div
               key={tick}
@@ -84,7 +84,9 @@ export default function TunerBar({ cents, note, freq, inTuneThreshold = 5, displ
         <div
           className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full z-20 ring-1 ring-black/10 dark:ring-white/20"
           style={{
-            left: `calc(${pct}% - 7px)`,
+            // Pinned at full scale the dot would sit half outside the bar and get
+            // clipped; clamping keeps the whole dot visible at both ends.
+            left: `clamp(1px, calc(${pct}% - 7px), calc(100% - 15px))`,
             backgroundColor: indicatorBg,
             boxShadow: indicatorGlow,
             transition: `background-color 75ms, box-shadow 75ms, left ${needleMs}ms linear`,
@@ -94,11 +96,14 @@ export default function TunerBar({ cents, note, freq, inTuneThreshold = 5, displ
 
       {/* Scale labels */}
       <div className="flex justify-between text-xs text-zinc-400 dark:text-zinc-600 px-0.5">
-        <span className={isFlat ? 'text-sky-500 font-medium' : ''}>−10</span>
+        <span className={isFlat ? 'text-sky-500 font-medium' : ''}>−{barRange}</span>
         <span className={`font-semibold tracking-wide ${inTune ? 'text-emerald-500' : ''}`}>
-          {inTune ? '✓ IN TUNE' : isFlat ? '▲ tune up' : '▼ tune down'}
+          {/* With the mic on and nothing playing there is nothing to tune down: the
+              old ternary fell through to "tune down" and pointed the user at a
+              string that was never measured. */}
+          {!hasSignal ? 'listening…' : inTune ? '✓ IN TUNE' : isFlat ? '▲ tune up' : '▼ tune down'}
         </span>
-        <span className={isSharp ? 'text-amber-500 font-medium' : ''}>+10</span>
+        <span className={isSharp ? 'text-amber-500 font-medium' : ''}>+{barRange}</span>
       </div>
     </div>
   )

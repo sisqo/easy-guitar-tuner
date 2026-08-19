@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { SETTINGS_DEFAULTS } from '../hooks/useSettings'
+import { SETTINGS_DEFAULTS } from '../data/settings'
 
 function InfoBox({ text }) {
   return (
@@ -9,13 +9,14 @@ function InfoBox({ text }) {
   )
 }
 
-function Slider({ label, description, info, settingKey, value, min, max, step, format, update }) {
+// Label, info toggle, current value and per-setting reset — shared by every kind
+// of control below so they line up and behave the same way.
+function Head({ label, info, settingKey, value, display, update }) {
   const [showInfo, setShowInfo] = useState(false)
   const isDefault = value === SETTINGS_DEFAULTS[settingKey]
-  const display = format ? format(value) : value
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">{label}</span>
@@ -33,7 +34,7 @@ function Slider({ label, description, info, settingKey, value, min, max, step, f
           )}
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-sm font-mono tabular-nums text-[#2aab9e]">{display}</span>
+          {display !== null && <span className="text-sm font-mono tabular-nums text-[#2aab9e]">{display}</span>}
           {!isDefault && (
             <button
               onClick={() => update(settingKey, SETTINGS_DEFAULTS[settingKey])}
@@ -44,6 +45,16 @@ function Slider({ label, description, info, settingKey, value, min, max, step, f
         </div>
       </div>
       {showInfo && <InfoBox text={info} />}
+    </>
+  )
+}
+
+function Slider({ label, description, info, settingKey, value, min, max, step, format, update }) {
+  const display = format ? format(value) : value
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Head label={label} info={info} settingKey={settingKey} value={value} display={display} update={update} />
       <input
         type="range"
         min={min} max={max} step={step}
@@ -57,6 +68,66 @@ function Slider({ label, description, info, settingKey, value, min, max, step, f
         <span>{format ? format(max) : max}</span>
       </div>
     </div>
+  )
+}
+
+// For settings whose values are a short fixed set — a slider would imply a
+// continuum that isn't there (fftSize must be a power of two).
+function Choice({ label, description, info, settingKey, value, options, update }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Head label={label} info={info} settingKey={settingKey} value={value} display={null} update={update} />
+      <div className="flex gap-1.5">
+        {options.map(o => (
+          <button
+            key={o.value}
+            onClick={() => update(settingKey, o.value)}
+            className={`flex-1 py-1.5 rounded-lg text-xs font-mono tabular-nums border transition-colors ${
+              value === o.value
+                ? 'bg-[#2aab9e]/10 border-[#2aab9e] text-[#2aab9e]'
+                : 'border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500'
+            }`}
+          >{o.label}</button>
+        ))}
+      </div>
+      {description && (
+        <div className="text-xs text-zinc-400 dark:text-zinc-600 text-center">{description}</div>
+      )}
+    </div>
+  )
+}
+
+function Toggle({ label, description, info, settingKey, value, update }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <Head label={label} info={info} settingKey={settingKey} value={value} display={null} update={update} />
+          {description && (
+            <div className="text-xs text-zinc-400 dark:text-zinc-600">{description}</div>
+          )}
+        </div>
+        <button
+          role="switch"
+          aria-checked={value}
+          aria-label={label}
+          onClick={() => update(settingKey, !value)}
+          className={`shrink-0 w-10 h-6 rounded-full border transition-colors ${
+            value ? 'bg-[#2aab9e] border-[#2aab9e]' : 'bg-zinc-200 dark:bg-zinc-700 border-transparent'
+          }`}
+        >
+          <span className={`block w-4 h-4 rounded-full bg-white transition-transform ${value ? 'translate-x-[22px]' : 'translate-x-[3px]'}`} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function SubHeading({ children }) {
+  return (
+    <h4 className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-600 pt-1">
+      {children}
+    </h4>
   )
 }
 
@@ -109,12 +180,20 @@ export default function SettingsPanel({ open, onClose, settings, update, resetAl
               info="How many cents off-centre a string can be and still count as in tune. A wider zone is easier to hit; a narrower zone requires more precision."
               update={update}
             />
+            <Choice
+              label="Bar range" settingKey="barRange"
+              value={settings.barRange}
+              options={[{ value: 15, label: '±15 ¢' }, { value: 25, label: '±25 ¢' }, { value: 50, label: '±50 ¢' }]}
+              description="Full scale of the bar"
+              info="How many cents the full width of the bar covers. A narrower range magnifies small errors — at ±25 the needle travels twice as far for the same three cents as it did at ±50, which is what makes fine tuning visible at all."
+              update={update}
+            />
             <Slider
               label="Bar smoothing" settingKey="displaySmooth"
               value={settings.displaySmooth} min={0.05} max={0.40} step={0.01}
               format={v => v.toFixed(2)}
               description="Needle fluidity"
-              info="Controls how fluidly the needle moves. Higher values react faster but may feel jittery; lower values are smoother but slower to follow pitch changes."
+              info="Controls how fluidly the needle glides. This is purely visual — the detector has already smoothed the pitch — so higher values simply track the reading more closely."
               update={update}
             />
           </section>
@@ -130,28 +209,95 @@ export default function SettingsPanel({ open, onClose, settings, update, resetAl
 
           {showAdvanced && (
             <section className="flex flex-col gap-5 -mt-4">
+              <SubHeading>Signal</SubHeading>
+              <Choice
+                label="Analysis window" settingKey="windowSize"
+                value={settings.windowSize}
+                options={[{ value: 4096, label: '4096' }, { value: 8192, label: '8192' }, { value: 16384, label: '16384' }]}
+                description="Samples per analysis"
+                info="How much audio each pitch estimate is measured over. At 48 kHz, 4096 samples is 85 ms — only about five and a half cycles of a low C, which is why bass strings read unsteadily. Doubling it doubles the cycles and steadies the low strings, at the cost of the same amount of latency."
+                update={update}
+              />
+              <Slider
+                label="Highpass" settingKey="hpFreq"
+                value={settings.hpFreq} min={40} max={90} step={5}
+                format={v => `${v} Hz`}
+                description="Cut rumble"
+                info="Removes handling noise, room rumble and DC offset before the detector sees the signal. Keep it below the lowest note you tune — Drop C's low C is 65 Hz."
+                update={update}
+              />
+              <Slider
+                label="Lowpass" settingKey="lpFreq"
+                value={settings.lpFreq} min={600} max={3000} step={100}
+                format={v => `${v} Hz`}
+                description="Cut partials"
+                info="Removes the upper harmonics that tempt the detector into reporting a note an octave too high. Lower it if you get octave errors; raise it if thin strings stop being detected."
+                update={update}
+              />
               <Slider
                 label="Noise gate" settingKey="noiseGate"
                 value={settings.noiseGate} min={0.001} max={0.02} step={0.001}
                 format={v => v.toFixed(3)}
                 description="Min RMS"
-                info="Minimum signal level required before pitch detection activates. Raise it if the tuner picks up ambient noise; lower it if notes are cut off too early during quiet playing."
+                info="Minimum signal level, measured after the filters, before pitch detection runs at all. Raise it if the tuner reacts to room noise; lower it if quiet plucks are ignored."
                 update={update}
               />
               <Slider
                 label="Clarity threshold" settingKey="clarityThreshold"
                 value={settings.clarityThreshold} min={0.70} max={0.98} step={0.01}
                 format={v => v.toFixed(2)}
-                description="McLeod confidence"
-                info="Confidence level required from the pitch detector before accepting a reading. Higher values give fewer false positives but may drop quiet or complex notes."
+                description="Confidence to accept"
+                info="How confident the detector must be for a reading to be used. Too high and a decaying string stops updating in the middle of tuning it; too low and noise gets through."
                 update={update}
               />
               <Slider
-                label="EMA smoothing" settingKey="smoothFactor"
+                label="Period selection (k)" settingKey="mpmK"
+                value={settings.mpmK} min={0.80} max={0.97} step={0.01}
+                format={v => v.toFixed(2)}
+                description="Octave control"
+                info="The detector's own threshold for deciding which repeat of the waveform counts as one cycle. This — not the clarity threshold — is what decides octaves: raise it to make the detector skip weak half-period matches and stop reporting notes an octave high."
+                update={update}
+              />
+
+              <SubHeading>Tracking</SubHeading>
+              <Slider
+                label="Smoothing (parked)" settingKey="smoothFactor"
                 value={settings.smoothFactor} min={0.05} max={0.50} step={0.01}
                 format={v => v.toFixed(2)}
-                description="Pitch reactivity"
-                info="Smoothing applied to the raw pitch signal between frames. Higher = faster and more reactive; lower = smoother but slower to follow rapid pitch changes."
+                description="While the pitch is steady"
+                info="Smoothing applied once the note has settled, expressed as the amount of catch-up per frame at 60 fps and rescaled to the real frame rate — so it behaves the same on a slow phone as on a desktop. Lower is steadier."
+                update={update}
+              />
+              <Slider
+                label="Smoothing (moving)" settingKey="smoothFactorFast"
+                value={settings.smoothFactorFast} min={0.20} max={0.80} step={0.05}
+                format={v => v.toFixed(2)}
+                description="While a peg is turning"
+                info="Smoothing used while the pitch is actually travelling. Keeping this separate is what lets the needle answer a peg turn immediately without becoming jittery once the string is parked."
+                update={update}
+              />
+              <Slider
+                label="Movement threshold" settingKey="fastGateCents"
+                value={settings.fastGateCents} min={5} max={30} step={1}
+                format={v => `${v} ¢`}
+                description="Counts as moving"
+                info="How far the reading has to be from the current one before the tuner treats the pitch as moving and switches to the faster smoothing."
+                update={update}
+              />
+              <Slider
+                label="Outlier gate" settingKey="rejectThreshold"
+                value={settings.rejectThreshold} min={10} max={80} step={5}
+                format={v => `${v} ¢`}
+                description="Needs confirming"
+                info="A reading further than this from the current note is not trusted on its own — it has to be confirmed by the readings that follow. Nothing is ever discarded outright, so a sustained new note always wins however far away it is."
+                update={update}
+              />
+              <Slider
+                label="Confirmation" settingKey="confirmFrames"
+                value={settings.confirmFrames} min={2} max={6} step={1}
+                format={v => `${v} reads`}
+                description="Agreeing readings"
+                info="How many agreeing readings it takes to accept a new note. Lower switches strings faster; higher is more resistant to the sharp transient at the start of a hard pluck."
                 update={update}
               />
               <Slider
@@ -159,23 +305,16 @@ export default function SettingsPanel({ open, onClose, settings, update, resetAl
                 value={settings.holdMs} min={200} max={3000} step={100}
                 format={v => `${v} ms`}
                 description="After silence"
-                info="How long the last detected note is displayed after the signal goes quiet. Longer values prevent the reading from disappearing during natural string decay."
+                info="How long the last note stays on screen once the signal is gone. Long enough to survive a string's natural decay, short enough that a stale reading does not linger."
                 update={update}
               />
-              <Slider
-                label="Outlier gate" settingKey="rejectThreshold"
-                value={settings.rejectThreshold} min={10} max={80} step={5}
-                format={v => `${v} ¢`}
-                description="Discard sudden jumps"
-                info="Pitch jumps larger than this value between consecutive frames are discarded as noise. Helps reject string buzz, fret rattle, and sudden detection spikes."
-                update={update}
-              />
-              <Slider
-                label="String change" settingKey="resetThreshold"
-                value={settings.resetThreshold} min={50} max={200} step={10}
-                format={v => `${v} ¢`}
-                description="New string threshold"
-                info="When the detected pitch jumps by more than this amount, the tuner switches to tracking a new string. Lower = switches strings faster; higher = stays on one string longer."
+
+              <SubHeading>Diagnostics</SubHeading>
+              <Toggle
+                label="Debug overlay" settingKey="debugOverlay"
+                value={settings.debugOverlay}
+                description="Show live detector stats"
+                info="Shows the raw frequency, clarity, signal level, which gate the last reading hit, and how many readings per second are being accepted. Accepted-per-second is the one to watch: a low number is what a tuner that feels unresponsive actually looks like."
                 update={update}
               />
             </section>

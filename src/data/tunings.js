@@ -1,4 +1,4 @@
-import { noteFreq } from '../utils/noteUtils'
+import { noteFreq } from '../utils/noteUtils.js'
 
 function buildStrings(pairs, diapason) {
   return pairs.map(([note, octave, label], i) => ({

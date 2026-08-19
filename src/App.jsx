@@ -6,7 +6,7 @@ import { useOscillator } from './hooks/useOscillator'
 import { useSuccessBeep } from './hooks/useSuccessBeep'
 import { useInstallPrompt } from './hooks/useInstallPrompt'
 import { getTunings } from './data/tunings'
-import { findClosestString, freqToNoteName, getCents, isInTune } from './utils/noteUtils'
+import { findClosestString, freqToNoteName, getCents } from './utils/noteUtils'
 import HamburgerMenu from './components/HamburgerMenu'
 import TunerBar from './components/TunerBar'
 import GuitarHeadstock from './components/GuitarHeadstock'
@@ -14,9 +14,17 @@ import MicButton from './components/MicButton'
 import SettingsPanel from './components/SettingsPanel'
 import ChordsView from './components/ChordsView'
 import KofiButton from './components/KofiButton'
+import DebugOverlay from './components/DebugOverlay'
 
-// How long the pitch must stay inside the in-tune zone before the success beep fires
-const IN_TUNE_BEEP_MS = 1500
+// How long the pitch must stay inside the in-tune zone before the success beep
+// fires. Shorter than it used to be because the zone itself is now ±3 cents:
+// holding 1500 ms inside a zone that narrow is a different ask entirely.
+const IN_TUNE_BEEP_MS = 900
+
+// Once green, it takes this much extra drift to go back to off. The headstock's
+// emerald ring is an SVG attribute with no CSS transition, so without hysteresis a
+// string parked on the edge of the zone makes it strobe.
+const HYSTERESIS_CENTS = 2
 
 function AutoToggle({ lockedStringId, activeStringId, strings, onToggle }) {
   const isLocked = lockedStringId !== null
@@ -82,9 +90,6 @@ export default function App() {
   const settingsRef = useRef(settings)
   useEffect(() => { settingsRef.current = settings }, [settings])
 
-  const inTuneStartRef = useRef(null)
-  const beepFiredRef = useRef(false)
-
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
   }, [dark])
@@ -102,7 +107,7 @@ export default function App() {
   const stringsRef = useRef(strings)
   useEffect(() => { stringsRef.current = strings }, [strings])
 
-  const { isListening, pitch, error, start, stop } = usePitchDetector(settingsRef, stringsRef)
+  const { isListening, pitch, error, start, stop, statsRef } = usePitchDetector(settingsRef, stringsRef)
   const { playNote, playChord } = useOscillator()
   const { beep } = useSuccessBeep()
 
@@ -128,9 +133,11 @@ export default function App() {
     setLockedStringId(null)
     setTunedStrings(new Set())
   }
-  function handleLockToggle(stringId) {
+  // useCallback so the memoized GuitarHeadstock actually gets to skip renders:
+  // a fresh function identity here would defeat it on every pitch update.
+  const handleLockToggle = useCallback((stringId) => {
     setLockedStringId(prev => prev === stringId ? null : stringId)
-  }
+  }, [])
 
   function handleInstall() {
     if (canInstall) {
@@ -140,7 +147,7 @@ export default function App() {
     }
   }
 
-  const { displayNote, displayCents, activeStringId, activeFreq, activeCents } = useMemo(() => {
+  const { displayNote, displayCents, activeStringId, activeFreq } = useMemo(() => {
     if (lockedStringId !== null) {
       const locked = strings.find(s => s.id === lockedStringId)
       const cents = locked && pitch ? getCents(pitch, locked.freq) : null
@@ -149,7 +156,6 @@ export default function App() {
         displayCents: cents ?? 0,
         activeStringId: lockedStringId,
         activeFreq: locked?.freq ?? null,
-        activeCents: cents ?? 0,
       }
     }
     const closest = findClosestString(pitch, strings)
@@ -158,29 +164,47 @@ export default function App() {
       displayCents: closest?.cents ?? 0,
       activeStringId: closest?.id ?? null,
       activeFreq: closest?.freq ?? null,
-      activeCents: closest?.cents ?? 0,
     }
   }, [lockedStringId, pitch, strings, settings.diapason])
 
+  // One latched in-tune verdict for the whole app: the bar, the headstock ring and
+  // the beep all read this, so they can never contradict each other.
+  const [inTune, setInTune] = useState(false)
   useEffect(() => {
-    if (isInTune(displayCents, settings.inTuneThreshold) && displayNote) {
-      if (inTuneStartRef.current === null) {
-        inTuneStartRef.current = Date.now()
-      } else if (Date.now() - inTuneStartRef.current >= IN_TUNE_BEEP_MS && !beepFiredRef.current) {
-        beep()
-        beepFiredRef.current = true
-        if (activeStringId !== null) {
-          // Mark all same-frequency strings as tuned (covers unison pairs like B3/B3')
-          const aFreq = strings.find(s => s.id === activeStringId)?.freq
-          const companions = strings.filter(s => aFreq != null && Math.abs(s.freq - aFreq) < 0.01).map(s => s.id)
-          setTunedStrings(prev => { const next = new Set(prev); companions.forEach(id => next.add(id)); return next })
-        }
-      }
-    } else {
-      inTuneStartRef.current = null
-      beepFiredRef.current = false
+    if (!displayNote) {
+      setInTune(false)
+      return
     }
-  }, [displayCents, displayNote, beep, settings.inTuneThreshold, activeStringId, strings])
+    const off = Math.abs(displayCents)
+    setInTune(prev => (prev ? off <= settings.inTuneThreshold + HYSTERESIS_CENTS : off <= settings.inTuneThreshold))
+  }, [displayNote, displayCents, settings.inTuneThreshold])
+
+  // The green band has to be drawn at whatever width the verdict is currently using,
+  // hysteresis included. Drawing it at the entry width while the latch holds until
+  // the exit width puts the dot visibly outside a band that says IN TUNE — at the
+  // default ±3 the slack is two thirds of the band's half-width, so the dot clears
+  // it entirely.
+  const zoneCents = inTune ? settings.inTuneThreshold + HYSTERESIS_CENTS : settings.inTuneThreshold
+
+  // A timer rather than a per-render dwell check. Polling `Date.now()` on every
+  // render only worked because the old detector pushed a new reading 60 times a
+  // second; a parked string now stops publishing entirely, so there would be no
+  // render left to poll on. The cleanup also means the dwell restarts by itself
+  // whenever the string, the note or the in-tune verdict changes — a string that
+  // was already in tune no longer hands its elapsed time to the next one.
+  useEffect(() => {
+    if (!inTune || !displayNote) return
+    const id = setTimeout(() => {
+      beep()
+      if (activeStringId !== null) {
+        // Mark all same-frequency strings as tuned (covers unison pairs like B3/B3')
+        const aFreq = strings.find(s => s.id === activeStringId)?.freq
+        const companions = strings.filter(s => aFreq != null && Math.abs(s.freq - aFreq) < 0.01).map(s => s.id)
+        setTunedStrings(prev => { const next = new Set(prev); companions.forEach(cid => next.add(cid)); return next })
+      }
+    }, IN_TUNE_BEEP_MS)
+    return () => clearTimeout(id)
+  }, [inTune, displayNote, activeStringId, beep, strings])
 
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 flex flex-col">
@@ -277,11 +301,13 @@ export default function App() {
                 cents={displayCents}
                 note={displayNote}
                 freq={pitch}
-                listening={isListening}
-                inTuneThreshold={settings.inTuneThreshold}
+                inTune={inTune}
+                zoneCents={zoneCents}
                 displaySmooth={settings.displaySmooth}
+                barRange={settings.barRange}
               />
             )}
+            {settings.debugOverlay && isListening && <DebugOverlay statsRef={statsRef} />}
           </div>
 
           {isListening && tunedStrings.size > 0 && (
@@ -305,11 +331,10 @@ export default function App() {
             activeStringId={activeStringId}
             activeFreq={activeFreq}
             lockedStringId={lockedStringId}
-            activeCents={activeCents}
             onStringSelect={handleLockToggle}
             onPlay={playNote}
             dark={dark}
-            inTuneThreshold={settings.inTuneThreshold}
+            inTune={inTune}
             tunedStrings={tunedStrings}
           />
         </div>

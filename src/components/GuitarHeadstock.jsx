@@ -1,4 +1,4 @@
-import { isInTune } from '../utils/noteUtils'
+import { memo } from 'react'
 
 // Layout definitions per instrument type
 const LAYOUTS = {
@@ -102,11 +102,13 @@ function stringColor(s, activeStringId, lockedStringId, dark, activeFreq) {
   return dark ? '#c4c9d1' : '#7c7c86' // resting steel string
 }
 
-function buttonStyle(s, activeStringId, lockedStringId, activeCents, dark, inTuneThreshold, tunedStrings, activeFreq) {
+function buttonStyle(s, activeStringId, lockedStringId, inTune, dark, tunedStrings, activeFreq) {
   const isLocked = s.id === lockedStringId
   // In auto mode, also treat same-frequency companions as active (unison course pairs)
   const isActive = lockedStringId !== null ? isLocked : (s.id === activeStringId || isSameFreq(s.freq, activeFreq))
-  const tuned = isActive && isInTune(activeCents, inTuneThreshold)
+  // `inTune` is latched in App and shared with the bar and the beep, so the ring
+  // no longer strobes on its own boundary check.
+  const tuned = isActive && inTune
   const isMarked = tunedStrings?.has(s.id) && !isActive
   if (tuned)     return { fill: dark ? '#052e16' : '#ecfdf5', stroke: '#10b981', sw: 2.5, marker: false }
   if (isLocked)  return { fill: dark ? '#082f49' : '#f0f9ff', stroke: '#38bdf8', sw: 2.5, marker: false }
@@ -115,8 +117,8 @@ function buttonStyle(s, activeStringId, lockedStringId, activeCents, dark, inTun
   return { fill: dark ? '#18181b' : '#ffffff', stroke: dark ? '#3f3f46' : '#d4d4d8', sw: 1.5, marker: false }
 }
 
-export default function GuitarHeadstock({
-  strings, activeStringId, activeFreq, lockedStringId, activeCents, onStringSelect, onPlay, dark, inTuneThreshold = 5, tunedStrings,
+function GuitarHeadstock({
+  strings, activeStringId, activeFreq, lockedStringId, inTune = false, onStringSelect, onPlay, dark, tunedStrings,
 }) {
   const L = getLayout(strings.length)
   const { viewBox, svgH, headstock: hs, nutH, nutXs, leftPegs, rightPegs,
@@ -282,7 +284,7 @@ export default function GuitarHeadstock({
         {strings.map((s, i) => {
           const btn = getBtnPos(i, L)
           if (!btn) return null
-          const { fill, stroke, sw: bsw, marker } = buttonStyle(s, activeStringId, lockedStringId, activeCents, dark, inTuneThreshold, tunedStrings, activeFreq)
+          const { fill, stroke, sw: bsw, marker } = buttonStyle(s, activeStringId, lockedStringId, inTune, dark, tunedStrings, activeFreq)
           return (
             <g key={`btn-${s.id}`} style={{ cursor: 'pointer' }} filter="url(#btn-shadow)"
                onClick={() => { onPlay(s.freq); onStringSelect(s.id) }}>
@@ -316,3 +318,9 @@ export default function GuitarHeadstock({
     </div>
   )
 }
+
+// The headstock is by far the heaviest node in the tree — a full SVG with gradients,
+// grain pattern and one Bezier per string. It only depends on which string is active
+// and whether it is in tune, not on the pitch itself, so it has no business
+// re-rendering every time a new reading arrives.
+export default memo(GuitarHeadstock)

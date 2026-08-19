@@ -23,7 +23,8 @@ npm run preview    # serve the production build locally
 ### Data flow
 
 ```
-tunings.js  →  App.jsx  →  usePitchDetector (pitch Hz)
+tunings.js  →  App.jsx  →  usePitchDetector (audio graph + loop)
+                        →      pitchTracker (gates, octave, smoothing) → pitch Hz
                         →  findClosestString / getCents
                         →  TunerBar (display)
                         →  GuitarHeadstock (string buttons + lock + tuned markers)
@@ -31,46 +32,79 @@ tunings.js  →  App.jsx  →  usePitchDetector (pitch Hz)
 
 `App.jsx` is the single stateful root. Persistent state uses `useLocalStorage` (`instrument`, `tuningKey`, `diapason`, `dark`). Transient state uses `useState`: `lockedStringId` (cleared on instrument/tuning change), `tunedStrings` (a `Set` of string IDs confirmed in tune, cleared on mic stop or instrument/tuning change), `settingsOpen`, `iosSheetOpen`.
 
-All detection parameters live in `useSettings` (persisted to localStorage as `egt-settings`) and are passed to `usePitchDetector` via a `settingsRef` — a `useRef` kept current in a `useEffect`. This lets the RAF loop read latest settings on every frame without restarting the AudioContext.
+All detection parameters live in `src/data/settings.js` (plain data, no React — so `scripts/` can import it) and are surfaced by `useSettings` (persisted to localStorage as `egt-settings`). They reach `usePitchDetector` via a `settingsRef` — a `useRef` kept current in a `useEffect` — so the loop reads the latest values every frame without restarting the AudioContext.
 
-### Pitch detection pipeline (`usePitchDetector`)
+`inTune` is latched **once** in `App.jsx`, with `HYSTERESIS_CENTS` of slack, and passed to `TunerBar`, `GuitarHeadstock` and the beep. Do not recompute it per component: they used to each call `isInTune()` on raw cents and visibly disagreed at the zone boundary.
 
-Runs a `requestAnimationFrame` loop on a 4096-sample `AnalyserNode` (no smoothing). Each frame goes through these gates in order:
+### Pitch detection pipeline
 
-1. **Noise gate** — RMS < `noiseGate` (default 0.001) → hold or clear
-2. **Clarity + range** — pitchy clarity ≥ `clarityThreshold` (default 0.90), frequency 70–660 Hz
-3. **Outlier rejection** — jump `rejectThreshold`–`resetThreshold` cents from smooth → discard
-4. **Octave correction** — jump > `resetThreshold` cents → try ÷2/×2; if the corrected value fits, it's an octave error not a string change
-5. **Reset** — jump > `resetThreshold` and not an octave error → new string
-6. **EMA smooth** — `smoothFactor` (default 0.15)
+Split in two: `usePitchDetector` owns the audio graph and the loop, `src/utils/pitchTracker.js` is a **pure** state machine that owns every decision. The split exists so the decisions are testable without a microphone — see `scripts/tracker-check.mjs`.
 
-After a valid reading, the last pitch is held for `holdMs` (default 1500 ms) to survive string decay.
+**Audio graph** (wired once in `start()`, never rewired, so no setting change restarts the AudioContext):
 
-All parameters above are live-readable via `settingsRef.current` — changes take effect immediately without restarting the mic.
+```
+getUserMedia → highpass(hpFreq, Q 0.7) → lowpass(lpFreq, Q 0.7) → AnalyserNode(windowSize)
+```
 
-### Settings (`useSettings`)
+Only the filter `frequency.value`s are live-adjustable. The lowpass is the defence against octave-up errors; the highpass removes rumble and DC. Measured effect: broadband noise at 0.02 amplitude arrives at the analyser as 0.0027 RMS, i.e. below the noise gate.
 
-Stored in localStorage as `egt-settings`. Defaults in `SETTINGS_DEFAULTS` (exported from `useSettings.js`):
+**Loop**: `requestAnimationFrame`, but analysis is throttled to `ANALYSIS_INTERVAL_MS` (30 ms). At 8192 samples the buffer only turns over every 171 ms, so running MPM 60×/s is ~80% redundant FFT work. `setPitch` fires only when the reading moved ≥ `PUBLISH_CENTS` (0.3), so a parked string stops re-rendering the tree entirely.
+
+**`trackPitch` gates, in order:**
+
+1. **Noise gate** — RMS < `noiseGate` → `gate: 'noise'`
+2. **Clarity** — pitchy clarity < `clarityThreshold` → `gate: 'clarity'`
+3. **Range** — outside 60–660 Hz → `gate: 'range'`. This is load-bearing: 50 Hz mains hum passes the clarity threshold on *every* frame (hum is perfectly periodic), and two strings ringing together produce a confident reading at their common subharmonic (E2 + A2 → ~27.5 Hz). The range check is what discards both — not clarity.
+4. **Octave resolution** (`resolveOctave`) — the detected value is trusted if it already sits within 35 cents of a string, which is what keeps a 12-string's E3 off its own ÷2 = E2. Only otherwise are ÷2/×2 considered, and only ones that land on a string, so a slack low E 160 cents flat is not doubled onto D3. With a reference in hand the nearest alternative to it wins; with none, the raw value stands.
+5. **Accept or confirm** — within `rejectThreshold` of the current note → median-of-5, then adaptive EMA. Beyond it → the reading joins `pending`, and only a run of `confirmFrames` agreeing readings (spaced half a window apart, so they are not three reads of one measurement) replaces the note. **Nothing is ever discarded outright**: no distance from the current note is unreachable, and a `PENDING_TIMEOUT_MS` backstop snaps even readings that never agree.
+6. **Hold** — evaluated on **every** frame, accepted or not. This placement matters: when the check lived only inside the failure branches, a run of frames that passed clarity but were all discarded refreshed nothing and cleared nothing, and the display stayed pinned to a stale note for as long as the string rang. That was the "I have to pluck the string several times" bug.
+
+**Adaptive smoothing**: `smoothFactorFast` while the pitch moves more than `fastGateCents`, `smoothFactor` once it parks. The alpha is defined at 60 fps and rescaled by the real frame interval (`emaAlpha`), so the time constant no longer doubles on a 30 fps phone.
+
+`mpmK` is assigned to pitchy's own `detector.clarityThreshold` — a **setter with no getter**, so the applied value is tracked in a local. It is MPM's *k*, which decides which NSDF peak counts as the period: this, not `settings.clarityThreshold`, is the octave-error control.
+
+### Settings (`src/data/settings.js`)
+
+Stored in localStorage as `egt-settings`, version-gated by `SETTINGS_VERSION`. Stored values win over defaults on the read path, so **retuning a default does nothing for an existing user** — bump `SETTINGS_VERSION` and list the key in `MIGRATED_KEYS` (or `RETIRED_KEYS` to delete it). `diapason` is deliberately never migrated: it is a user preference, not a detection parameter.
 
 | Key | Default | Description |
 |-----|---------|-------------|
 | `diapason` | 440 | A4 reference Hz |
-| `noiseGate` | 0.001 | Min RMS to start detection |
-| `clarityThreshold` | 0.90 | Min pitchy confidence |
-| `smoothFactor` | 0.15 | EMA on raw pitch |
-| `holdMs` | 1500 | Note hold after silence (ms) |
-| `inTuneThreshold` | 5 | In-tune zone (±cents) |
-| `displaySmooth` | 0.12 | TunerBar needle smoothing |
-| `rejectThreshold` | 75 | Outlier gate (cents) |
-| `resetThreshold` | 100 | String change threshold (cents) |
+| `inTuneThreshold` | 3 | In-tune zone (±cents) |
+| `barRange` | 25 | TunerBar full scale (±cents) |
+| `displaySmooth` | 0.22 | Needle glide only |
+| `windowSize` | 8192 | `fftSize` — samples per analysis |
+| `hpFreq` | 55 | Highpass Hz |
+| `lpFreq` | 1200 | Lowpass Hz |
+| `noiseGate` | 0.003 | Min RMS, measured after the filters |
+| `clarityThreshold` | 0.82 | Min pitchy confidence |
+| `mpmK` | 0.90 | pitchy's period selection (octave control) |
+| `smoothFactor` | 0.18 | EMA alpha at 60 fps, pitch parked |
+| `smoothFactorFast` | 0.45 | EMA alpha, pitch moving |
+| `fastGateCents` | 12 | Movement threshold for the fast alpha |
+| `rejectThreshold` | 45 | Beyond this a reading needs confirming |
+| `confirmFrames` | 3 | Agreeing readings to accept a new note |
+| `holdMs` | 1200 | Note hold after silence (ms) |
+| `debugOverlay` | false | Show `DebugOverlay` under the bar |
+
+`windowSize` 8192 is a measured choice, not a guess: on a clean signal 4096 is indistinguishable, but in a realistically noisy one 8192 roughly halves the jitter (low E 2.1¢ → 1.3¢ sd). 16384 gains little for another 171 ms of latency. Re-run `node scripts/detector-bench.mjs` after touching any signal-chain default.
+
+### Verifying detection changes
+
+```bash
+node scripts/tracker-check.mjs    # tracker state machine, no mic needed
+node scripts/detector-bench.mjs   # accuracy/jitter vs window size, offline
+```
+
+`tracker-check` sweeps step changes from 50 to 700 cents; that sweep is the regression test for the dead zone. Do not verify precision in a headless browser: Chromium's fake capture device is not sample-accurate and adds a systematic offset of ~10 cents of its own. It is fine for *functional* checks (does the note switch, are there console errors) — use the real mic plus `debugOverlay` for anything about accuracy.
 
 ### Main layout (`App.jsx`)
 
 Stack order in `<main>`:
-1. **Selector row** — `InstrumentTabs` + `TuningSelector` (compact `<select>` with `flex-1`) + `AutoToggle` chip
-2. **Mic button** — standalone centered block, primary action
-3. **Tuner bar card** — empty state (mic off) or live `TunerBar`
-4. **GuitarHeadstock** — SVG with string buttons and tuned markers
+1. **Mic button** + `AutoToggle` chip — primary action row (instrument and tuning are `<select>`s inside `HamburgerMenu`, not in the main stack)
+2. **Tuner panel** — one card: empty state (mic off) or live `TunerBar`, then `DebugOverlay` when enabled, then the tuned-string progress dots, then `GuitarHeadstock`
+
+`GuitarHeadstock` is wrapped in `React.memo` — it is the heaviest node in the tree, and it must not re-render on every reading. That is why `handleLockToggle` is a `useCallback`; a fresh identity there would defeat the memo.
 
 ### AutoToggle
 
@@ -109,7 +143,11 @@ Hook captures `beforeinstallprompt` (Android Chrome), detects iOS Safari (`/ipho
 
 ### Display scale
 
-`TunerBar` shows cents mapped to a **−10 … +10 display scale** (divide actual cents by 5). The physical bar still spans ±50 cents; only the labels change. Color: flat = sky-400 `#38bdf8`, sharp = amber-400 `#fbbf24`, in tune = emerald-500 `#10b981`.
+`TunerBar` reads out **real cents, to the cent**, and both the bar and its labels span ±`barRange` (default 25). It used to show `Math.round(cents / 5)` on a fixed ±50 bar, which meant a string three cents out looked perfectly in tune — half of "not as precise as other tuners" was this, not the detector.
+
+The needle is a CSS `left` transition retargeted on each update; `displaySmooth` only sets its duration. All the real smoothing happens in `pitchTracker`, so the number, the colour and the dot describe the same value.
+
+Color: flat = sky-400 `#38bdf8`, sharp = amber-400 `#fbbf24`, in tune = emerald-500 `#10b981`.
 
 ### Build-time constants
 
