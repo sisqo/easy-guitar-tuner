@@ -24,7 +24,8 @@ npm run preview    # serve the production build locally
 
 ```
 tunings.js  →  App.jsx  →  usePitchDetector (audio graph + loop)
-                        →      pitchTracker (gates, octave, smoothing) → pitch Hz
+                        →      detector.js  (NSDF candidates + spectrum: support, freshness, refined Hz)
+                        →      pitchTracker (gate, candidate choice, confirmation, smoothing) → pitch Hz
                         →  findClosestString / getCents
                         →  TunerBar (display)
                         →  GuitarHeadstock (string buttons + lock + tuned markers)
@@ -38,7 +39,7 @@ All detection parameters live in `src/data/settings.js` (plain data, no React �
 
 ### Pitch detection pipeline
 
-Split in two: `usePitchDetector` owns the audio graph and the loop, `src/utils/pitchTracker.js` is a **pure** state machine that owns every decision. The split exists so the decisions are testable without a microphone — see `scripts/tracker-check.mjs`.
+Split in three: `usePitchDetector` owns the audio graph and the loop, `src/utils/detector.js` turns a window of samples into a list of **candidates**, and `src/utils/pitchTracker.js` is a **pure** state machine that chooses among them and owns every decision. Both utils are plain JS with no React or Web Audio, so `scripts/` can drive them with synthetic signals — see "Verifying detection changes".
 
 **Audio graph** (wired once in `start()`, never rewired, so no setting change restarts the AudioContext):
 
@@ -46,22 +47,30 @@ Split in two: `usePitchDetector` owns the audio graph and the loop, `src/utils/p
 getUserMedia → highpass(hpFreq, Q 0.7) → lowpass(lpFreq, Q 0.7) → AnalyserNode(windowSize)
 ```
 
-Only the filter `frequency.value`s are live-adjustable. The lowpass is the defence against octave-up errors; the highpass removes rumble and DC. Measured effect: broadband noise at 0.02 amplitude arrives at the analyser as 0.0027 RMS, i.e. below the noise gate.
+Only the filter `frequency.value`s are live-adjustable. The lowpass keeps upper partials from tempting the period search into the half-period peak; the highpass removes rumble and DC. Measured effect: broadband noise at 0.02 amplitude arrives at the analyser as 0.0027 RMS.
 
-**Loop**: `requestAnimationFrame`, but analysis is throttled to `ANALYSIS_INTERVAL_MS` (30 ms). At 8192 samples the buffer only turns over every 171 ms, so running MPM 60×/s is ~80% redundant FFT work. `setPitch` fires only when the reading moved ≥ `PUBLISH_CENTS` (0.3), so a parked string stops re-rendering the tree entirely.
+**Loop**: `requestAnimationFrame`, but analysis is throttled to `ANALYSIS_INTERVAL_MS` (30 ms). At 8192 samples the buffer only turns over every 171 ms, so running the detector 60×/s is ~85% redundant FFT work. `setPitch` fires only when the reading moved ≥ `PUBLISH_CENTS` (0.3), so a parked string stops re-rendering the tree entirely.
 
-**`trackPitch` gates, in order:**
+**Detector** (`Detector.analyse(buffer, sampleRate, now, gateLevel)` → `{ rms, fresh, candidates }`). It does *not* return one pitch. It returns every key maximum of McLeod's NSDF that lies in 60–660 Hz (`MIN_FREQ`/`MAX_FREQ` live here) with height ≥ 0.3, sorted by descending frequency, and annotates each from a Hann power spectrum of the same window:
 
-1. **Noise gate** — RMS < `noiseGate` → `gate: 'noise'`
-2. **Clarity** — pitchy clarity < `clarityThreshold` → `gate: 'clarity'`
-3. **Range** — outside 60–660 Hz → `gate: 'range'`. This is load-bearing: 50 Hz mains hum passes the clarity threshold on *every* frame (hum is perfectly periodic), and two strings ringing together produce a confident reading at their common subharmonic (E2 + A2 → ~27.5 Hz). The range check is what discards both — not clarity.
-4. **Octave resolution** (`resolveOctave`) — the detected value is trusted if it already sits within 35 cents of a string, which is what keeps a 12-string's E3 off its own ÷2 = E2. Only otherwise are ÷2/×2 considered, and only ones that land on a string, so a slack low E 160 cents flat is not doubled onto D3. With a reference in hand the nearest alternative to it wins; with none, the raw value stands.
-5. **Accept or confirm** — within `rejectThreshold` of the current note → median-of-5, then adaptive EMA. Beyond it → the reading joins `pending`, and only a run of `confirmFrames` agreeing readings (spaced half a window apart, so they are not three reads of one measurement) replaces the note. **Nothing is ever discarded outright**: no distance from the current note is unreachable, and a `PENDING_TIMEOUT_MS` backstop snaps even readings that never agree.
-6. **Hold** — evaluated on **every** frame, accepted or not. This placement matters: when the check lived only inside the failure branches, a run of frames that passed clarity but were all discarded refreshed nothing and cleared nothing, and the display stayed pinned to a stale note for as long as the string rang. That was the "I have to pluck the string several times" bug.
+- `n` — the NSDF height, i.e. how much of the window's energy repeats at that period. With another string ringing under the note it is that note's *share* of the energy, not a measure of noise.
+- `support` — the candidate's fundamental or 2nd harmonic is a real spectral peak (a local maximum, not the skirt of a neighbour's lobe) within 30 dB of the strongest partial. The common subharmonic of two strings (E2 + A2 repeat every 36 ms) has none.
+- `fresh` — after a pluck, the fundamental's power *grew* by ≥ 50% against the spectrum from before the pluck. A pluck is an RMS rise of ≥ 1.35× against one window ago (`ONSET_RATIO`); the reference spectrum is the frame one window back, and stays the reference for 1.5 windows (`FRESH_WINDOWS`). What grew is what the user just played; the string still ringing from before did not.
+- `hz` — the frequency re-estimated from the candidate's own first partials with Grandke's interpolator (exact for a Hann window), weighted by (magnitude × k)² and de-emphasised beyond h2 because string stiffness reads higher partials sharp. The NSDF peak of the note being tuned is pulled by whatever else is ringing; its partials are not. Falls back to the NSDF value (`hzNsdf`) when no partial peak is found.
 
-**Adaptive smoothing**: `smoothFactorFast` while the pitch moves more than `fastGateCents`, `smoothFactor` once it parks. The alpha is defined at 60 fps and rescaled by the real frame interval (`emaAlpha`), so the time constant no longer doubles on a 30 fps phone.
+This replaced pitchy's `PitchDetector`, whose single answer — first peak ≥ k × tallest — sat on the shared subharmonic as soon as a previous string held more than ~10% of the energy. Measured on a simulated session plucking the six strings 0.7 s apart without muting, that showed nothing at all for five of them. `fft.js` (which pitchy used internally) is now a direct dependency.
 
-`mpmK` is assigned to pitchy's own `detector.clarityThreshold` — a **setter with no getter**, so the applied value is tracked in a local. It is MPM's *k*, which decides which NSDF peak counts as the period: this, not `settings.clarityThreshold`, is the octave-error control.
+**Tracker** (`trackPitch(state, { candidates, rms, fresh, now, windowMs }, settings, strings)` → `{ hz, gate, pick }`), in order:
+
+1. **Noise gate** — `rms < effectiveGate()` → `gate: 'noise'`. The gate is the larger of `noiseGate` (absolute) and 1.6× a learned floor. The floor drops to any quieter frame at once, rises at most 50%/s and only on frames that yielded no note, and starts at `noiseGate` rather than the first frame's level — so the room is learned in a couple of seconds, a ringing note never becomes the floor, and opening the app mid-note does not teach it that the note is the room. The hook passes the gate to the detector so the period search is skipped below it (the frame is still logged for onset detection).
+2. **Choice** (`choose`) among candidates with `support`, three regimes tried in order. *Fresh pluck*: only `fresh` candidates are eligible and McLeod's rule (`pickMpm`: highest frequency with `n ≥ mpmK × tallest`) picks among them, at `clarityThreshold`. *Continuation*: the best candidate within `rejectThreshold` of the held note, down to `clarityTrack` — a decaying string loses clarity long before it stops being the same note. *Cold start / no match*: McLeod's rule over everything supported, at `clarityThreshold`. Nothing qualifies → `gate: 'clarity'`.
+3. **Octave resolution** (`resolveOctave`) on the pick — unchanged: trusted if within 35 cents of a string (keeps a 12-string's E3 off its own ÷2), otherwise ÷2/×2 only onto a string, nearest to the reference.
+4. **Accept or confirm** — within `rejectThreshold` of the current note → median-of-5, then adaptive EMA. Beyond it → `pending`, and a run of `confirmFrames` agreeing readings (spaced half a window apart) replaces the note, with a `PENDING_TIMEOUT_MS` backstop so nothing is ever unreachable. **A pick attributed to a pluck (`viaOnset`) needs one reading**: the confirmation run exists to stop a stray from displacing the note, and a pluck is not a stray. During the fresh period the median buffer restarts from the latest reading and the fast alpha applies, because the readings glide down from the sharp attack and a median over them is pure lag (it kept the needle 30 cents high while the reading was already within 10).
+5. **Hold** — evaluated on **every** frame, accepted or not; the note is cleared `holdMs` after the last accepted frame. When this lived only inside the failure branches a run of discarded frames pinned the display to a stale note for as long as the string rang.
+
+**Adaptive smoothing**: `smoothFactorFast` while the pitch moves more than `fastGateCents` (or the frame is fresh), `smoothFactor` once it parks. The alpha is defined at 60 fps and rescaled by the real frame interval (`emaAlpha`), so the time constant does not double on a 30 fps phone.
+
+`mpmK` is McLeod's *k*: which NSDF peak counts as the period, as a fraction of the tallest in range. It governs octave selection; the clarity settings only decide whether a chosen candidate is trusted.
 
 ### Settings (`src/data/settings.js`)
 
@@ -76,9 +85,10 @@ Stored in localStorage as `egt-settings`, version-gated by `SETTINGS_VERSION`. S
 | `windowSize` | 8192 | `fftSize` — samples per analysis |
 | `hpFreq` | 55 | Highpass Hz |
 | `lpFreq` | 1200 | Lowpass Hz |
-| `noiseGate` | 0.003 | Min RMS, measured after the filters |
-| `clarityThreshold` | 0.82 | Min pitchy confidence |
-| `mpmK` | 0.90 | pitchy's period selection (octave control) |
+| `noiseGate` | 0.001 | Absolute RMS floor after the filters; the adaptive gate sits above it |
+| `clarityThreshold` | 0.55 | NSDF height to show a note not already on screen |
+| `clarityTrack` | 0.45 | NSDF height to keep following the note on screen |
+| `mpmK` | 0.90 | McLeod's period selection *k* (octave control) |
 | `smoothFactor` | 0.18 | EMA alpha at 60 fps, pitch parked |
 | `smoothFactorFast` | 0.45 | EMA alpha, pitch moving |
 | `fastGateCents` | 12 | Movement threshold for the fast alpha |
@@ -87,16 +97,23 @@ Stored in localStorage as `egt-settings`, version-gated by `SETTINGS_VERSION`. S
 | `holdMs` | 1200 | Note hold after silence (ms) |
 | `debugOverlay` | false | Show `DebugOverlay` under the bar |
 
-`windowSize` 8192 is a measured choice, not a guess: on a clean signal 4096 is indistinguishable, but in a realistically noisy one 8192 roughly halves the jitter (low E 2.1¢ → 1.3¢ sd). 16384 gains little for another 171 ms of latency. Re-run `node scripts/detector-bench.mjs` after touching any signal-chain default.
+`windowSize` 8192 is a measured choice, not a guess: on a clean signal 4096 is indistinguishable, but in a realistically noisy one 8192 cuts the jitter by 3–4× (low E 0.96¢ → 0.23¢ sd), and the spectral refinement needs the resolution. 16384 gains little for another 171 ms of latency. Re-run `node scripts/detector-bench.mjs` after touching any signal-chain default.
+
+`clarityThreshold` 0.55 is deliberately moderate: a string plucked while the others ring holds only part of the window's energy, and which string it is gets decided by `fresh`/`support`, not by this number. At the old 0.82 the user had to mute everything else — or pluck again, harder — before anything moved.
 
 ### Verifying detection changes
 
 ```bash
-node scripts/tracker-check.mjs    # tracker state machine, no mic needed
-node scripts/detector-bench.mjs   # accuracy/jitter vs window size, offline
+node scripts/tracker-check.mjs    # tracker decisions on hand-built candidate lists, no audio
+node scripts/detector-bench.mjs   # detector accuracy/jitter vs window size on single notes
+node scripts/pipeline-bench.mjs   # whole chain on simulated tuning sessions (the one that matters)
 ```
 
-`tracker-check` sweeps step changes from 50 to 700 cents; that sweep is the regression test for the dead zone. Do not verify precision in a headless browser: Chromium's fake capture device is not sample-accurate and adds a systematic offset of ~10 cents of its own. It is fine for *functional* checks (does the note switch, are there console errors) — use the real mic plus `debugOverlay` for anything about accuracy.
+`pipeline-bench` is the acceptance test for detection changes: it synthesises plucked strings (`scripts/lib/synth.mjs`, shared by both benches) and runs filters → detector → tracker on sessions the single-note bench cannot see — the six strings plucked 0.7 s and 1.3 s apart without muting, plucks at decreasing strength, a phone mic's rolled-off low E, hum, silence — and reports time-to-display, time-to-settle, share of correct frames, false positives and parked jitter. `SETTINGS='{"clarityThreshold":0.7}' node scripts/pipeline-bench.mjs` tries an override. Its "first" and "settle" columns are dominated by the synthetic attack glide (45¢, τ 60 ms) plus the window; compare runs against each other, not against zero.
+
+`tracker-check` sweeps step changes from 50 to 700 cents (the dead-zone regression) and hand-builds candidate lists for the cases the choice logic exists for: the string just plucked vs the taller shared subharmonic, unsupported peaks, continuation at low clarity, false onsets, the adaptive gate.
+
+The synth accumulates phase per sample. An earlier version wrote `sin(2π·f(t)·t)`, whose instantaneous frequency carries a `t·f'(t)` term that read 4–5 cents flat for a few hundred ms — and was mistaken for detector bias. Do not verify precision in a headless browser: Chromium's fake capture device is not sample-accurate and adds a systematic offset of ~10 cents of its own. It is fine for *functional* checks (does the note switch, are there console errors) — use the real mic plus `debugOverlay` for anything about accuracy.
 
 ### Main layout (`App.jsx`)
 

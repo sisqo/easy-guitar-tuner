@@ -1,10 +1,10 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
-import { PitchDetector } from 'pitchy'
 import { SETTINGS_DEFAULTS } from '../data/settings'
-import { createTrackerState, trackPitch, cents } from '../utils/pitchTracker'
+import { Detector } from '../utils/detector'
+import { createTrackerState, trackPitch, effectiveGate, cents } from '../utils/pitchTracker'
 
-// A 4096-sample window at 48 kHz turns over every 85 ms, so consecutive analyses
-// share ~80% of their samples — running the detector once per animation frame is
+// An 8192-sample window at 48 kHz turns over every 171 ms, so consecutive analyses
+// share ~85% of their samples — running the detector once per animation frame is
 // mostly redundant FFT work. 30 ms keeps all the independent information the
 // analyser can actually give while leaving the main thread to the UI.
 const ANALYSIS_INTERVAL_MS = 30
@@ -38,8 +38,8 @@ export function usePitchDetector(settingsRef, stringsRef) {
   // the instrumentation is that observing the detector must not change how often
   // the app renders.
   const statsRef = useRef({
-    rawHz: 0, clarity: 0, rms: 0, smoothedHz: null, gate: 'idle',
-    acceptedPerSec: 0, analysesPerSec: 0, windowSize: 0, sampleRate: 0,
+    rawHz: 0, clarity: 0, rms: 0, gateLevel: 0, smoothedHz: null, gate: 'idle', fresh: false,
+    candidates: 0, acceptedPerSec: 0, analysesPerSec: 0, windowSize: 0, sampleRate: 0,
   })
 
   const stop = useCallback(() => {
@@ -61,7 +61,7 @@ export function usePitchDetector(settingsRef, stringsRef) {
     }
     analyserRef.current = null
     trackerRef.current = createTrackerState()
-    statsRef.current = { ...statsRef.current, gate: 'idle', smoothedHz: null, rawHz: 0, clarity: 0, rms: 0 }
+    statsRef.current = { ...statsRef.current, gate: 'idle', smoothedHz: null, rawHz: 0, clarity: 0, rms: 0, fresh: false, candidates: 0 }
     setIsListening(false)
     setPitch(null)
   }, [])
@@ -90,10 +90,9 @@ export function usePitchDetector(settingsRef, stringsRef) {
 
       // Wired once and never rewired: only the frequencies are live-adjustable, so
       // changing a filter setting never has to tear down the AudioContext.
-      // The lowpass is the real defence against octave-up errors — it removes the
-      // upper partials that tempt MPM into picking the half-period peak. The
-      // highpass takes out handling rumble and DC, which otherwise inflate the RMS
-      // and make the noise gate meaningless.
+      // The lowpass removes the upper partials that would otherwise tempt the period
+      // search into the half-period peak. The highpass takes out handling rumble and
+      // DC, which otherwise inflate the RMS and make the noise gate meaningless.
       const highpass = ctx.createBiquadFilter()
       highpass.type = 'highpass'
       highpass.frequency.value = settings.hpFreq
@@ -110,13 +109,8 @@ export function usePitchDetector(settingsRef, stringsRef) {
       lowpass.connect(analyser)
       streamRef.current = stream
 
-      let detector = PitchDetector.forFloat32Array(windowSize)
-      let buffer = new Float32Array(detector.inputLength)
-      // pitchy exposes clarityThreshold as a setter with no getter, so the applied
-      // value has to be tracked here. It is MPM's k — which NSDF peak counts as the
-      // period — so it governs octave selection, unlike settings.clarityThreshold
-      // which only decides whether a finished reading is trusted.
-      let appliedK = null
+      let detector = new Detector(windowSize)
+      let buffer = new Float32Array(windowSize)
 
       audioCtxRef.current = ctx
       analyserRef.current = analyser
@@ -148,31 +142,23 @@ export function usePitchDetector(settingsRef, stringsRef) {
         if (wanted !== windowSize) {
           windowSize = wanted
           analyser.fftSize = windowSize
-          detector = PitchDetector.forFloat32Array(windowSize)
-          buffer = new Float32Array(detector.inputLength)
-          appliedK = null
+          detector = new Detector(windowSize)
+          buffer = new Float32Array(windowSize)
           trackerRef.current = createTrackerState()
-        }
-        if (s.mpmK !== appliedK) {
-          detector.clarityThreshold = s.mpmK
-          appliedK = s.mpmK
         }
 
         analyser.getFloatTimeDomainData(buffer)
 
-        let rms = 0
-        for (let i = 0; i < buffer.length; i++) rms += buffer[i] * buffer[i]
-        rms = Math.sqrt(rms / buffer.length)
+        // The tracker owns the gate (absolute floor plus an adaptive one that
+        // learns the room); the detector skips the period search below it but
+        // still logs the frame, so a pluck out of silence is seen as an onset.
+        const tracker = trackerRef.current
+        const gateLevel = effectiveGate(tracker, s)
+        const { rms, fresh, candidates } = detector.analyse(buffer, ctx.sampleRate, now, gateLevel)
 
-        let rawHz = 0
-        let clarity = 0
-        if (rms >= s.noiseGate) {
-          [rawHz, clarity] = detector.findPitch(buffer, ctx.sampleRate)
-        }
-
-        const { hz, gate } = trackPitch(
-          trackerRef.current,
-          { rawHz, clarity, rms, now, windowMs: (windowSize / ctx.sampleRate) * 1000 },
+        const { hz, gate, pick } = trackPitch(
+          tracker,
+          { candidates, rms, fresh, now, windowMs: (windowSize / ctx.sampleRate) * 1000 },
           s,
           stringsRef?.current ?? [],
         )
@@ -190,11 +176,17 @@ export function usePitchDetector(settingsRef, stringsRef) {
         analyses++
         if (gate === 'ok') accepted++
         const stats = statsRef.current
-        stats.rawHz = rawHz
-        stats.clarity = clarity
+        // With nothing picked, show the strongest candidate so the overlay says
+        // what was there and why it was not enough.
+        const shown = pick ?? candidates.reduce((a, c) => (a === null || c.n > a.n ? c : a), null)
+        stats.rawHz = shown ? shown.hz : 0
+        stats.clarity = shown ? shown.n : 0
         stats.rms = rms
+        stats.gateLevel = gateLevel
         stats.smoothedHz = hz
         stats.gate = gate
+        stats.fresh = fresh
+        stats.candidates = candidates.length
         stats.windowSize = windowSize
         stats.sampleRate = ctx.sampleRate
         const span = now - counterAt

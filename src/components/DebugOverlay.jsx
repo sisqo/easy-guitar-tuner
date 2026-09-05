@@ -3,7 +3,9 @@ import { useEffect, useState } from 'react'
 // Reads the detector's stats ref on its own clock rather than receiving props, so
 // that watching the pipeline never adds a render to it. `acceptedPerSec` is the
 // number to watch: it is what "responsive" actually means here — a reading that
-// updates in bursts feels like a tuner that ignored you.
+// updates in bursts feels like a tuner that ignored you. `picked` is the candidate
+// the tracker used this frame (or the tallest one when none qualified), `clarity`
+// its NSDF height, `gate level` the RMS the adaptive noise gate currently demands.
 const POLL_MS = 100
 
 const GATE_COLOR = {
@@ -13,7 +15,6 @@ const GATE_COLOR = {
   hold:    'text-sky-500 dark:text-sky-400',
   noise:   'text-zinc-400 dark:text-zinc-600',
   clarity: 'text-zinc-400 dark:text-zinc-600',
-  range:   'text-zinc-400 dark:text-zinc-600',
   idle:    'text-zinc-400 dark:text-zinc-600',
 }
 
@@ -39,11 +40,14 @@ export default function DebugOverlay({ statsRef }) {
   return (
     <div className="mt-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white/60 dark:bg-black/40 px-3 py-2 font-mono text-[10px] leading-relaxed">
       <div className="grid grid-cols-2 gap-x-4">
-        <Row label="raw" value={s.rawHz ? `${s.rawHz.toFixed(2)} Hz` : '—'} />
+        <Row label="picked" value={s.rawHz ? `${s.rawHz.toFixed(2)} Hz` : '—'} />
         <Row label="tracked" value={s.smoothedHz ? `${s.smoothedHz.toFixed(2)} Hz` : '—'} />
         <Row label="clarity" value={s.clarity ? s.clarity.toFixed(3) : '—'} />
+        <Row label="candidates" value={s.candidates ?? 0} />
         <Row label="rms" value={s.rms ? s.rms.toFixed(4) : '—'} />
+        <Row label="gate level" value={s.gateLevel ? s.gateLevel.toFixed(4) : '—'} />
         <Row label="gate" value={s.gate} className={GATE_COLOR[s.gate] ?? ''} />
+        <Row label="onset" value={s.fresh ? 'fresh' : '—'} className={s.fresh ? 'text-amber-500 dark:text-amber-400' : ''} />
         <Row label="accepted/s" value={s.acceptedPerSec} />
         <Row label="analyses/s" value={s.analysesPerSec} />
         <Row

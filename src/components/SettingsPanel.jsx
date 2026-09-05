@@ -236,18 +236,26 @@ export default function SettingsPanel({ open, onClose, settings, update, resetAl
               />
               <Slider
                 label="Noise gate" settingKey="noiseGate"
-                value={settings.noiseGate} min={0.001} max={0.02} step={0.001}
-                format={v => v.toFixed(3)}
-                description="Min RMS"
-                info="Minimum signal level, measured after the filters, before pitch detection runs at all. Raise it if the tuner reacts to room noise; lower it if quiet plucks are ignored."
+                value={settings.noiseGate} min={0.0005} max={0.01} step={0.0005}
+                format={v => v.toFixed(4)}
+                description="Absolute floor, RMS"
+                info="The quietest signal, measured after the filters, that pitch detection will run on at all. The tuner also learns the room: the working gate sits about 4 dB above the quietest level it has heard recently and comes back down the moment things get quieter, so this floor only matters in a very quiet room. Raise it if the tuner reacts to room noise; lower it if quiet plucks are ignored."
                 update={update}
               />
               <Slider
-                label="Clarity threshold" settingKey="clarityThreshold"
-                value={settings.clarityThreshold} min={0.70} max={0.98} step={0.01}
+                label="Clarity (new note)" settingKey="clarityThreshold"
+                value={settings.clarityThreshold} min={0.40} max={0.90} step={0.01}
                 format={v => v.toFixed(2)}
-                description="Confidence to accept"
-                info="How confident the detector must be for a reading to be used. Too high and a decaying string stops updating in the middle of tuning it; too low and noise gets through."
+                description="Confidence to show a note"
+                info="How periodic the signal must be before a note that is not already on screen gets shown. A string plucked while the others still ring only holds part of the energy, so this is deliberately moderate — which string you just played is decided from the spectrum, not from this number. Too high and you have to mute the other strings to see anything; too low and noise gets through."
+                update={update}
+              />
+              <Slider
+                label="Clarity (tracking)" settingKey="clarityTrack"
+                value={settings.clarityTrack} min={0.20} max={0.80} step={0.01}
+                format={v => v.toFixed(2)}
+                description="Confidence to keep following"
+                info="How periodic the signal must stay for the note already on screen to keep updating. Lower than the threshold for a new note on purpose: a decaying string loses clarity long before it stops being the same note, and this is what keeps the reading alive to the end of the decay instead of freezing mid-tuning."
                 update={update}
               />
               <Slider
@@ -255,7 +263,7 @@ export default function SettingsPanel({ open, onClose, settings, update, resetAl
                 value={settings.mpmK} min={0.80} max={0.97} step={0.01}
                 format={v => v.toFixed(2)}
                 description="Octave control"
-                info="The detector's own threshold for deciding which repeat of the waveform counts as one cycle. This — not the clarity threshold — is what decides octaves: raise it to make the detector skip weak half-period matches and stop reporting notes an octave high."
+                info="The detector's threshold for deciding which repeat of the waveform counts as one cycle, as a fraction of the strongest repeat. This — not the clarity thresholds — is what decides octaves: raise it to make the detector skip weak half-period matches and stop reporting notes an octave high."
                 update={update}
               />
 
@@ -297,7 +305,7 @@ export default function SettingsPanel({ open, onClose, settings, update, resetAl
                 value={settings.confirmFrames} min={2} max={6} step={1}
                 format={v => `${v} reads`}
                 description="Agreeing readings"
-                info="How many agreeing readings it takes to accept a new note. Lower switches strings faster; higher is more resistant to the sharp transient at the start of a hard pluck."
+                info="How many agreeing readings it takes to accept a new note that arrives without an audible attack — a string that was already ringing when you started, or a peg turned past the outlier gate. A pluck the tuner hears as an onset switches on the very first reading regardless."
                 update={update}
               />
               <Slider

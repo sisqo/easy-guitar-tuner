@@ -1,7 +1,7 @@
 // Detection and display parameters, kept as plain data (no React) so the tuning
 // values are importable by scripts/tracker-check.mjs as well as by the app.
 
-export const SETTINGS_VERSION = 3
+export const SETTINGS_VERSION = 4
 
 export const SETTINGS_DEFAULTS = {
   // Tuning
@@ -16,9 +16,10 @@ export const SETTINGS_DEFAULTS = {
   windowSize:        8192,  // analyser fftSize — samples per analysis
   hpFreq:            55,    // highpass, Hz — handling rumble and DC
   lpFreq:            1200,  // lowpass, Hz — partials that cause octave errors
-  noiseGate:         0.003, // minimum RMS, measured after the filters
-  clarityThreshold:  0.82,  // minimum MPM confidence to accept a reading
-  mpmK:              0.90,  // pitchy's own period-selection k (octave control)
+  noiseGate:         0.001, // absolute RMS floor, after the filters; the adaptive gate sits above it
+  clarityThreshold:  0.55,  // NSDF height needed to start a new note
+  clarityTrack:      0.45,  // NSDF height needed to keep following the current note
+  mpmK:              0.90,  // McLeod's period-selection k (octave control)
 
   // Tracking
   smoothFactor:      0.18,  // EMA alpha at 60 fps, while the pitch is parked
@@ -37,7 +38,7 @@ export const SETTINGS_DEFAULTS = {
 // `diapason` is the user's own preference and is always preserved.
 export const MIGRATED_KEYS = [
   'inTuneThreshold', 'barRange', 'displaySmooth',
-  'windowSize', 'hpFreq', 'lpFreq', 'noiseGate', 'clarityThreshold', 'mpmK',
+  'windowSize', 'hpFreq', 'lpFreq', 'noiseGate', 'clarityThreshold', 'clarityTrack', 'mpmK',
   'smoothFactor', 'smoothFactorFast', 'fastGateCents', 'rejectThreshold',
   'confirmFrames', 'holdMs',
 ]
