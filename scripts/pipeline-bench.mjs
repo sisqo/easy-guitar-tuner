@@ -6,6 +6,7 @@
 // pluck stays tracked, and whether noise or hum ever shows a note.
 //
 //   node scripts/pipeline-bench.mjs
+//   PRESET=steady node scripts/pipeline-bench.mjs                         # a built-in preset
 //   SETTINGS='{"clarityThreshold":0.7}' node scripts/pipeline-bench.mjs   # try overrides
 //
 // Columns: first = ms from the pluck until the display is within 15¢ of the note,
@@ -14,14 +15,14 @@
 // note (> 30¢ off), until = last moment in the decay the reading was still right,
 // sd = jitter of the displayed cents while parked.
 
-import { SETTINGS_DEFAULTS } from '../src/data/settings.js'
 import { Detector } from '../src/utils/detector.js'
 import { createTrackerState, trackPitch, effectiveGate } from '../src/utils/pitchTracker.js'
 import { getTunings } from '../src/data/tunings.js'
 import { SR, cents, biquad, applyBiquad, pluck, decayFor, makeRng, hum } from './lib/synth.mjs'
+import { resolveBenchSettings, benchSettingsLabel } from './lib/bench-settings.mjs'
 
 const STEP_S = 0.03 // ANALYSIS_INTERVAL_MS
-const S = { ...SETTINGS_DEFAULTS, ...(process.env.SETTINGS ? JSON.parse(process.env.SETTINGS) : {}) }
+const S = resolveBenchSettings()
 const SIX = getTunings(440).guitar6.tunings.standard.strings
 const F = Object.fromEntries(SIX.map(s => [s.label, s.freq]))
 
@@ -99,7 +100,8 @@ function report(title, frames, events, seconds) {
   return rows
 }
 
-console.log(`\nSettings in play: window ${S.windowSize}, gate ${S.noiseGate}, clarity ${S.clarityThreshold}` +
+console.log(`\nRunning: ${benchSettingsLabel()}`)
+console.log(`Settings in play: window ${S.windowSize}, gate ${S.noiseGate}, clarity ${S.clarityThreshold}` +
   (S.clarityTrack !== undefined ? `/${S.clarityTrack}` : '') + `, k ${S.mpmK}, confirm ${S.confirmFrames}, hold ${S.holdMs}\n`)
 
 const summary = {}

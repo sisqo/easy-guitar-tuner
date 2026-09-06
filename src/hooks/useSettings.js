@@ -30,6 +30,13 @@ export function useSettings() {
     setSettings(prev => ({ ...prev, [key]: value }))
   }
 
+  // Bulk write, for applying a preset: one state update rather than sixteen, and
+  // it deliberately merges — a preset only carries PRESET_KEYS, so the reference
+  // pitch, the debug switch and `_v` survive a preset change untouched.
+  function applyValues(values) {
+    setSettings(prev => ({ ...prev, ...values }))
+  }
+
   function resetAll() {
     setSettings(SETTINGS_DEFAULTS)
   }
@@ -37,5 +44,5 @@ export function useSettings() {
   // Fill in any missing keys (e.g. after adding new settings)
   const merged = { ...SETTINGS_DEFAULTS, ...settings }
 
-  return { settings: merged, update, resetAll }
+  return { settings: merged, update, applyValues, resetAll }
 }

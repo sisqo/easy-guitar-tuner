@@ -1,5 +1,11 @@
-import { useState } from 'react'
+import { useState, createContext, useContext } from 'react'
 import { SETTINGS_DEFAULTS } from '../data/settings'
+import PresetManager from './PresetManager'
+
+// What each setting's ↺ reverts to. Not the defaults: while you are experimenting,
+// "undo this knob" means back to the preset you are working from — resetting to a
+// default the active preset never used would silently mix two configurations.
+const BaselineContext = createContext(SETTINGS_DEFAULTS)
 
 function InfoBox({ text }) {
   return (
@@ -13,7 +19,9 @@ function InfoBox({ text }) {
 // of control below so they line up and behave the same way.
 function Head({ label, info, settingKey, value, display, update }) {
   const [showInfo, setShowInfo] = useState(false)
-  const isDefault = value === SETTINGS_DEFAULTS[settingKey]
+  const baseline = useContext(BaselineContext)
+  const base = baseline[settingKey] ?? SETTINGS_DEFAULTS[settingKey]
+  const isBase = value === base
 
   return (
     <>
@@ -35,11 +43,11 @@ function Head({ label, info, settingKey, value, display, update }) {
         </div>
         <div className="flex items-center gap-2">
           {display !== null && <span className="text-sm font-mono tabular-nums text-[#2aab9e]">{display}</span>}
-          {!isDefault && (
+          {!isBase && (
             <button
-              onClick={() => update(settingKey, SETTINGS_DEFAULTS[settingKey])}
+              onClick={() => update(settingKey, base)}
               className="text-xs text-zinc-400 dark:text-zinc-600 hover:text-zinc-600 dark:hover:text-zinc-400 transition-colors"
-              title="Reset to default"
+              title="Reset to preset value"
             >↺</button>
           )}
         </div>
@@ -57,6 +65,7 @@ function Slider({ label, description, info, settingKey, value, min, max, step, f
       <Head label={label} info={info} settingKey={settingKey} value={value} display={display} update={update} />
       <input
         type="range"
+        aria-label={label}
         min={min} max={max} step={step}
         value={value}
         onChange={e => update(settingKey, parseFloat(e.target.value))}
@@ -131,7 +140,7 @@ function SubHeading({ children }) {
   )
 }
 
-export default function SettingsPanel({ open, onClose, settings, update, resetAll }) {
+export default function SettingsPanel({ open, onClose, settings, update, resetAll, preset }) {
   const [showAdvanced, setShowAdvanced] = useState(false)
 
   return (
@@ -146,6 +155,7 @@ export default function SettingsPanel({ open, onClose, settings, update, resetAl
           <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">Settings</h2>
           <button
             onClick={onClose}
+            aria-label="Close settings"
             className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -155,6 +165,9 @@ export default function SettingsPanel({ open, onClose, settings, update, resetAl
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-7">
+          <BaselineContext.Provider value={preset.activeValues}>
+
+          <PresetManager preset={preset} />
 
           {/* Tuning */}
           <section className="flex flex-col gap-4">
@@ -327,6 +340,7 @@ export default function SettingsPanel({ open, onClose, settings, update, resetAl
               />
             </section>
           )}
+          </BaselineContext.Provider>
         </div>
 
         {/* Footer */}

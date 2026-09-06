@@ -1,17 +1,20 @@
 import { useMemo, useEffect, useRef, useState, useCallback } from 'react'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useSettings } from './hooks/useSettings'
+import { usePresets } from './hooks/usePresets'
 import { usePitchDetector } from './hooks/usePitchDetector'
 import { useOscillator } from './hooks/useOscillator'
 import { useSuccessBeep } from './hooks/useSuccessBeep'
 import { useInstallPrompt } from './hooks/useInstallPrompt'
 import { getTunings } from './data/tunings'
+import { DEFAULT_PRESET_ID } from './data/settings'
 import { findClosestString, freqToNoteName, getCents } from './utils/noteUtils'
 import HamburgerMenu from './components/HamburgerMenu'
 import TunerBar from './components/TunerBar'
 import GuitarHeadstock from './components/GuitarHeadstock'
 import MicButton from './components/MicButton'
 import SettingsPanel from './components/SettingsPanel'
+import PresetSelector from './components/PresetSelector'
 import ChordsView from './components/ChordsView'
 import KofiButton from './components/KofiButton'
 import DebugOverlay from './components/DebugOverlay'
@@ -84,7 +87,16 @@ export default function App() {
 
   const { canInstall, isIOS, showInstallOption, install } = useInstallPrompt()
 
-  const { settings, update, resetAll } = useSettings()
+  const { settings, update, applyValues, resetAll } = useSettings()
+  const preset = usePresets(settings, applyValues)
+
+  // "Reset to defaults" writes the whole settings object — reference pitch and
+  // debug switch included — so the preset is only marked, not re-applied on top.
+  const handleResetAll = useCallback(() => {
+    resetAll()
+    preset.setActivePreset(DEFAULT_PRESET_ID)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetAll, preset.setActivePreset])
 
   // Keep a ref so the RAF loop in usePitchDetector always reads latest settings
   const settingsRef = useRef(settings)
@@ -273,6 +285,19 @@ export default function App() {
             onToggle={handleLockToggle}
           />
         </div>
+        {/* Detection preset — one tap to compare two configurations mid-session */}
+        <div className="relative z-30">
+          <PresetSelector
+            presets={preset.presets}
+            activeId={preset.activeId}
+            active={preset.active}
+            dirty={preset.dirty}
+            onSelect={preset.selectPreset}
+            onSave={preset.saveActive}
+            onSaveAs={preset.saveAs}
+            onRevert={preset.revert}
+          />
+        </div>
         {error && (
           <p className="-mt-1 text-center text-xs text-red-500 dark:text-red-400 leading-snug">
             {error === 'Microphone access denied.'
@@ -353,7 +378,8 @@ export default function App() {
         onClose={() => setSettingsOpen(false)}
         settings={settings}
         update={update}
-        resetAll={resetAll}
+        resetAll={handleResetAll}
+        preset={preset}
       />
 
       {iosSheetOpen && (

@@ -31,7 +31,9 @@ tunings.js  →  App.jsx  →  usePitchDetector (audio graph + loop)
                         →  GuitarHeadstock (string buttons + lock + tuned markers)
 ```
 
-`App.jsx` is the single stateful root. Persistent state uses `useLocalStorage` (`instrument`, `tuningKey`, `diapason`, `dark`). Transient state uses `useState`: `lockedStringId` (cleared on instrument/tuning change), `tunedStrings` (a `Set` of string IDs confirmed in tune, cleared on mic stop or instrument/tuning change), `settingsOpen`, `iosSheetOpen`.
+`App.jsx` is the single stateful root. Persistent state uses `useLocalStorage` (`instrument`, `tuningKey`, `diapason`, `dark`, and the two preset keys below). Transient state uses `useState`: `lockedStringId` (cleared on instrument/tuning change), `tunedStrings` (a `Set` of string IDs confirmed in tune, cleared on mic stop or instrument/tuning change), `settingsOpen`, `iosSheetOpen`.
+
+`useLocalStorage`'s setter is stable and reads the current value through a ref. It has to be both: preset actions are `useCallback`s that outlive the render they were created in, and two writes can land in the same tick. Reading `stored` straight from the render closure broke renaming a preset — the update was applied to the library as it stood when the callback was created, which was before any preset existed.
 
 All detection parameters live in `src/data/settings.js` (plain data, no React — so `scripts/` can import it) and are surfaced by `useSettings` (persisted to localStorage as `egt-settings`). They reach `usePitchDetector` via a `settingsRef` — a `useRef` kept current in a `useEffect` — so the loop reads the latest values every frame without restarting the AudioContext.
 
@@ -99,6 +101,18 @@ Stored in localStorage as `egt-settings`, version-gated by `SETTINGS_VERSION`. S
 
 `windowSize` 8192 is a measured choice, not a guess: on a clean signal 4096 is indistinguishable, but in a realistically noisy one 8192 cuts the jitter by 3–4× (low E 0.96¢ → 0.23¢ sd), and the spectral refinement needs the resolution. 16384 gains little for another 171 ms of latency. Re-run `node scripts/detector-bench.mjs` after touching any signal-chain default.
 
+#### Presets
+
+A preset is a named snapshot of the detection and display parameters, so a session with the guitar in hand can compare *more aggressive* against *more tolerant* by tapping a chip instead of remembering sixteen slider positions.
+
+- **What travels**: `PRESET_KEYS`, aliased to `MIGRATED_KEYS` on purpose — both answer the same question, "is this a parameter of ours to retune, or the user's own preference?". `diapason` and `debugOverlay` are excluded, so switching preset never moves somebody's A or flips the overlay.
+- **Full snapshots, not diffs**: a preset stores every one of `PRESET_KEYS`. A diff against the defaults would silently change meaning the next time a default is retuned, and an experiment that felt right last month has to still mean the same thing. Keys added later are filled in from `SETTINGS_DEFAULTS` on the read path.
+- **Built-ins** (`BUILTIN_PRESETS`) are written as deltas from the defaults in source — readable and reviewable — and materialised into full snapshots at module load. `standard` / `reactive` / `steady` / `noisy`, read-only; editing one and saving forks it into a user preset. Their values were chosen from `pipeline-bench` runs, not taste: `reactive` trades 191 ms → 135 ms to first reading for 3× the parked jitter (that is the 4096 window), `steady` trims the parked jitter (0.05¢ → 0.03¢ sd) for 10 ms of first reading and 30 ms of settle, `noisy` stops room noise at the gate instead of at the clarity test and gives up quiet plucks late in the decay. 16384 was tried for `steady` and rejected — it dropped fast string switching to 96% correct and bought no steadiness.
+- **State**: two localStorage keys, `egt-presets` (the user library) and `egt-preset-active` (the id). Separate because switching preset is the hot path and has no business rewriting the whole library JSON. "Modified" is **derived** — `PRESET_KEYS.some(k => settings[k] !== activeValues[k])` — never stored, so a preset can never claim to be applied when a slider says otherwise.
+- **Version bumps**: do *not* bump `SETTINGS_VERSION` for a preset change; no default is moving. Each saved preset is stamped with the `_v` it was captured at, and on a future bump the active id falls back to `standard` while the library is left intact — otherwise a stale user preset stays applied over freshly retuned defaults.
+- **Baseline**: `SettingsPanel` reverts each setting's ↺ to the *active preset's* value, threaded down through `BaselineContext`, not to `SETTINGS_DEFAULTS`. While experimenting, "undo this knob" means back to the preset you are working from; resetting to a default the preset never used would silently mix two configurations. The footer's "Reset to defaults" is the one caller that writes the whole settings object (reference pitch included), so it marks `standard` active rather than re-applying it on top.
+- **Live switching**: every preset key is applied without restarting the AudioContext, `windowSize` included — the loop reallocates the `Detector` and buffer when it changes (`usePitchDetector.js`). Two consequences worth knowing when comparing presets mid-note: a switch that leaves `windowSize` alone keeps the tracker state, so the held note, the median buffer and the learned noise floor all carry over and the first `holdMs` after the switch is a hybrid; a switch that changes `windowSize` calls `createTrackerState()` and drops all three, including the learned floor, so the room is relearned over the next couple of seconds. Neither is new — that is what the `windowSize` slider has always done — but it means `reactive` (4096) is the one preset whose A/B is not instantaneous.
+
 `clarityThreshold` 0.55 is deliberately moderate: a string plucked while the others ring holds only part of the window's energy, and which string it is gets decided by `fresh`/`support`, not by this number. At the old 0.82 the user had to mute everything else — or pluck again, harder — before anything moved.
 
 ### Verifying detection changes
@@ -108,6 +122,8 @@ node scripts/tracker-check.mjs    # tracker decisions on hand-built candidate li
 node scripts/detector-bench.mjs   # detector accuracy/jitter vs window size on single notes
 node scripts/pipeline-bench.mjs   # whole chain on simulated tuning sessions (the one that matters)
 ```
+
+`PRESET=steady node scripts/pipeline-bench.mjs` runs a built-in preset; `PRESET=noisy SETTINGS='{"lpFreq":800}' node ...` layers an override on top (`scripts/lib/bench-settings.mjs`). This is what closes the loop between the app and the benches — the presets the switcher offers are the same objects, so "this one felt better on the guitar" gets answered with the numbers that chose the defaults.
 
 `pipeline-bench` is the acceptance test for detection changes: it synthesises plucked strings (`scripts/lib/synth.mjs`, shared by both benches) and runs filters → detector → tracker on sessions the single-note bench cannot see — the six strings plucked 0.7 s and 1.3 s apart without muting, plucks at decreasing strength, a phone mic's rolled-off low E, hum, silence — and reports time-to-display, time-to-settle, share of correct frames, false positives and parked jitter. `SETTINGS='{"clarityThreshold":0.7}' node scripts/pipeline-bench.mjs` tries an override. Its "first" and "settle" columns are dominated by the synthetic attack glide (45¢, τ 60 ms) plus the window; compare runs against each other, not against zero.
 
@@ -119,7 +135,8 @@ The synth accumulates phase per sample. An earlier version wrote `sin(2π·f(t)�
 
 Stack order in `<main>`:
 1. **Mic button** + `AutoToggle` chip — primary action row (instrument and tuning are `<select>`s inside `HamburgerMenu`, not in the main stack)
-2. **Tuner panel** — one card: empty state (mic off) or live `TunerBar`, then `DebugOverlay` when enabled, then the tuned-string progress dots, then `GuitarHeadstock`
+2. **`PresetSelector`** — the detection-preset chip and its popover. On the tuner screen rather than behind Settings because comparing two sets of parameters is only useful if it costs one tap with a guitar in your hands; saving and reverting live in the popover too, since walking to a side panel to keep a setting you just found is how you lose it. Its wrapper carries `z-30` so the popover covers the tuner card. `PresetManager` (rename, delete, and the same save/revert) sits at the top of `SettingsPanel`.
+3. **Tuner panel** — one card: empty state (mic off) or live `TunerBar`, then `DebugOverlay` when enabled, then the tuned-string progress dots, then `GuitarHeadstock`
 
 `GuitarHeadstock` is wrapped in `React.memo` — it is the heaviest node in the tree, and it must not re-render on every reading. That is why `handleLockToggle` is a `useCallback`; a fresh identity there would defeat the memo.
 
