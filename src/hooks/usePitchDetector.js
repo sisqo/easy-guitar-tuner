@@ -144,7 +144,14 @@ export function usePitchDetector(settingsRef, stringsRef) {
           analyser.fftSize = windowSize
           detector = new Detector(windowSize)
           buffer = new Float32Array(windowSize)
+          // The held note and the median buffer were measured through the old
+          // window and go with it; the learned room floor does not. The RMS of
+          // stationary noise barely depends on window length, and relearning it
+          // would mean a preset A/B across a window change ran the two presets
+          // against different noise gates — which is the comparison, not a detail.
+          const { floor } = trackerRef.current
           trackerRef.current = createTrackerState()
+          trackerRef.current.floor = floor
         }
 
         analyser.getFloatTimeDomainData(buffer)

@@ -349,7 +349,7 @@ export default function SettingsPanel({ open, onClose, settings, update, resetAl
             onClick={resetAll}
             className="w-full py-2.5 rounded-xl text-sm font-medium text-zinc-500 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
           >
-            Reset to defaults
+            Reset everything to defaults
           </button>
         </div>
       </div>

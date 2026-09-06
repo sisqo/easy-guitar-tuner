@@ -22,7 +22,7 @@ function GroupLabel({ children }) {
 }
 
 export default function PresetSelector({
-  presets, activeId, active, dirty, onSelect, onSave, onSaveAs, onRevert,
+  presets, activeId, active, dirty, suggestedName, onSelect, onSave, onSaveAs, onRevert,
 }) {
   const [open, setOpen] = useState(false)
   const [naming, setNaming] = useState(false)
@@ -60,7 +60,7 @@ export default function PresetSelector({
   }
 
   function startNaming() {
-    setDraft(dirty && !active.builtin ? `${active.label} 2` : `${active.label} copy`)
+    setDraft(suggestedName)
     setNaming(true)
   }
 

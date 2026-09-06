@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect } from 'react'
 import { useLocalStorage } from './useLocalStorage'
 import {
   SETTINGS_DEFAULTS, SETTINGS_VERSION, BUILTIN_PRESETS, DEFAULT_PRESET_ID,
@@ -29,12 +29,18 @@ export function usePresets(settings, applyValues) {
   const userPresets = Array.isArray(library) ? library : []
   const presets = [...BUILTIN_PRESETS, ...userPresets]
 
-  // A user preset captured under older defaults must not stay silently applied over
-  // freshly retuned ones — a version bump drops back to the built-in default and
-  // leaves the library alone, so nothing the user saved is lost.
-  const stored = presets.find(p => p.id === storedActiveId)
-  const stale = stored && !stored.builtin && stored._v !== SETTINGS_VERSION
-  const active = (stale || !stored) ? BUILTIN_PRESETS[0] : stored
+  // A user preset captured under older defaults must not stay silently *applied*
+  // over freshly retuned ones. This is a one-shot check on what storage held at
+  // startup, not a rule applied on every render: the library is left alone, so
+  // nothing the user saved is lost and they can still pick that preset on purpose
+  // afterwards — which a per-render rule would have answered by showing Standard.
+  useEffect(() => {
+    const wasActive = (Array.isArray(library) ? library : []).find(p => p.id === storedActiveId)
+    if (wasActive && wasActive._v !== SETTINGS_VERSION) setActiveId(DEFAULT_PRESET_ID)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const active = presets.find(p => p.id === storedActiveId) ?? BUILTIN_PRESETS[0]
   const activeId = active.id
 
   const activeValues = fullValues(active)
@@ -90,8 +96,12 @@ export function usePresets(settings, applyValues) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storedActiveId])
 
+  // One spelling of the default name for a fork, so the popover and the settings
+  // panel cannot drift apart on it.
+  const suggestedName = `${active.label} copy`
+
   return {
-    presets, userPresets, activeId, active, activeValues, dirty,
+    presets, userPresets, activeId, active, activeValues, dirty, suggestedName,
     selectPreset, saveActive, saveAs, revert, renamePreset, deletePreset,
     // Marks a preset active *without* applying it, for the one caller that has
     // already written the values itself — "reset to defaults" writes the whole

@@ -77,12 +77,12 @@ function Row({ preset, active, onSelect, onRename, onDelete }) {
 }
 
 export default function PresetManager({ preset }) {
-  const { active, activeId, userPresets, dirty, selectPreset, saveActive, saveAs, revert, renamePreset, deletePreset } = preset
+  const { active, activeId, userPresets, dirty, suggestedName, selectPreset, saveActive, saveAs, revert, renamePreset, deletePreset } = preset
   const [naming, setNaming] = useState(false)
   const [draft, setDraft] = useState('')
 
   function startNaming() {
-    setDraft(active.builtin ? `${active.label} copy` : `${active.label} 2`)
+    setDraft(suggestedName)
     setNaming(true)
   }
 

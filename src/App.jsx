@@ -292,6 +292,7 @@ export default function App() {
             activeId={preset.activeId}
             active={preset.active}
             dirty={preset.dirty}
+            suggestedName={preset.suggestedName}
             onSelect={preset.selectPreset}
             onSave={preset.saveActive}
             onSaveAs={preset.saveAs}
