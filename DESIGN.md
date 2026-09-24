@@ -1,196 +1,141 @@
 ---
 name: EasyGuitarTuner
 description: Chromatic tuner for guitar and ukulele — precise, fast, invisible.
+source: claude.ai/design project "Tuner Mobile 2a" + "Logo" (1a)
 colors:
-  bg-deep: "#09090b"
-  surface: "#18181b"
-  surface-raised: "#27272a"
-  border: "#3f3f46"
-  text-primary: "#f4f4f5"
-  text-secondary: "#a1a1aa"
-  text-muted: "#71717a"
-  brand-teal: "#2aab9e"
+  # CSS variables in src/index.css (.dark redefines them); Tailwind names in brackets
+  bg-dark: "#0b0b0d"        # [canvas]
+  bg-light: "#f5f5f3"
+  surface-dark: "#141416"   # [surface] chips, buttons
+  surface-light: "#ffffff"
+  card-dark: "#18181b"      # [card] sheet rows, chip rest
+  card-light: "#ffffff"
+  well-dark: "#0e0e10"      # [well] segmented-control track
+  well-light: "#efefec"
+  sheet-dark: "#141416"     # [sheet] bottom sheets, settings
+  sheet-light: "#fafaf9"
+  line-dark: "#232327"      # [line] 1px borders
+  line-light: "#e4e4e7"
+  panel-from-dark: "#121214"
+  panel-from-light: "#ffffff"
+  panel-line-dark: "#1d1d21"
+  panel-line-light: "#e4e4e7"
+  ink-dark: "#f4f4f5"       # [ink]
+  ink-light: "#18181b"
+  ink-2-dark: "#a1a1aa"     # [ink-2]
+  ink-2-light: "#52525b"
+  muted-dark: "#71717a"     # [muted]
+  muted-light: "#71717a"
+  faint-dark: "#52525b"     # [faint]
+  faint-light: "#a1a1aa"
+  seg-off-dark: "#1f1f23"
+  seg-off-light: "#e7e7ea"
+  brand-teal: "#2aab9e"             # [brand]
   signal-in-tune: "#10b981"
   signal-flat: "#38bdf8"
   signal-sharp: "#fbbf24"
   signal-error: "#f87171"
+  kofi: "#72a4f2"
 typography:
-  display:
-    fontFamily: "JetBrains Mono, Fira Code, monospace"
-    fontSize: "3.75rem"
-    fontWeight: 700
-    lineHeight: 1
-    letterSpacing: "normal"
-  body:
-    fontFamily: "JetBrains Mono, Fira Code, monospace"
-    fontSize: "0.875rem"
-    fontWeight: 400
-    lineHeight: 1.5
-  label:
-    fontFamily: "JetBrains Mono, Fira Code, monospace"
-    fontSize: "0.75rem"
-    fontWeight: 400
-    lineHeight: 1
-    letterSpacing: "0.1em"
+  ui: "Geist 400/500/600"
+  data: "Geist Mono 400/500"
+  note: { font: Geist, size: 84px, weight: 500, tracking: "-0.04em" }
+  cents: { font: Geist Mono, size: 26px, weight: 500 }
+  wordmark: { font: Geist, size: 16px, weight: 600, tracking: "-0.02em" }
+  body: { font: Geist, size: 13-14px, weight: 500 }
+  meta: { font: Geist Mono, size: 11px }
 rounded:
-  sm: "8px"
-  md: "12px"
-  lg: "16px"
+  segment: "3px"
+  control: "12px"
+  row: "14px"
+  card: "16px"
+  panel: "28px"
   full: "9999px"
-spacing:
-  xs: "6px"
-  sm: "12px"
-  md: "16px"
-  lg: "24px"
-components:
-  button-mic-active:
-    backgroundColor: "{colors.signal-in-tune}"
-    textColor: "#ffffff"
-    rounded: "{rounded.full}"
-    size: "40px"
-  button-mic-inactive:
-    backgroundColor: "{colors.surface-raised}"
-    textColor: "{colors.text-secondary}"
-    rounded: "{rounded.full}"
-    size: "40px"
-  select-control:
-    backgroundColor: "{colors.surface-raised}"
-    textColor: "{colors.text-primary}"
-    rounded: "{rounded.sm}"
-    padding: "8px 12px"
-  tuner-card:
-    backgroundColor: "{colors.surface}"
-    rounded: "{rounded.lg}"
-    padding: "16px 20px"
 ---
 
 # Design System: EasyGuitarTuner
 
 ## 1. Overview
 
-**Creative North Star: "The Precision Instrument"**
+**North star: "The Precision Instrument."** The app should feel like a good clip-on or pedal tuner: one reading, readable at arm's length, nothing that asks for attention while you tune. The redesign keeps that and gives it a calmer, more contemporary voice: a sans UI face, mono only for numbers, soft near-black surfaces, and one large panel that holds the reading and the headstock.
 
-EasyGuitarTuner looks and feels like a piece of high-quality hardware — a standalone chromatic tuner pulled from a pedalboard, not an app downloaded from a store. The visual language is calibrated, not decorated. Every element is present because it does a job. Nothing is present to signal that a designer was here.
+Dark is the default (stage, rehearsal room, practice at night); light is a full peer, not an afterthought. Both come from one set of CSS variables.
 
-The aesthetic is dark because that is what dark means in this context: stage light, rehearsal room, practice at night. The surface palette spans `#09090b` to `#27272a` — a tight ramp of near-blacks that create depth through tonal layering rather than shadow. The single brand color, Calibration Teal, appears only where the instrument speaks: in the logo, in the brand name, and nowhere else on the neutral chrome.
+## 2. Colour
 
-The type is mono throughout — JetBrains Mono — because frequency values, cent readings, and note names are data, and data belongs in a monospaced face. The note name displayed at 3.75rem is the largest element on screen because it is the only thing the user needs to read in the moment of tuning.
+### Surfaces
+A tight near-black ramp in dark (`#0b0b0d` → `#141416` → `#18181b`, borders `#232327`), warm off-white in light (`#f5f5f3` page, white surfaces). Depth comes from that ramp plus two very soft effects: a 1px inner highlight on panels (`--panel-inset`), and the tuner panel's gradient from `--panel-from` down into the page colour.
 
-**Key Characteristics:**
-- Tonal depth without shadows — layers of near-black create surface hierarchy
-- Mono-only typography — reinforces the instrument aesthetic, never casual
-- Calibration Teal as a single accent, used with restraint
-- Signal colors (emerald, sky, amber) carry the functional communication load
-- No decorative chrome — every border, background, and color has a reason
+### Brand teal (`#2aab9e`)
+Identity and selection, never signal: "Guitar" in the wordmark, the centre bar of the icon, a selected chip or preset (50% border, 8–12% fill), the chord root dot, the star of a pinned chord, the settings slider thumb. It never means "in tune" — that is emerald's job.
 
-## 2. Colors: The Instrument Palette
-
-A near-monochrome dark palette with a single brand accent and a purpose-built signal vocabulary.
-
-### Primary
-- **Calibration Teal** (`#2aab9e`): The brand accent. Used for the word "Guitar" in the header logotype and drawn from the outer ring of the logo. Not an interactive affordance — a mark of identity. It appears once per screen.
-
-### Secondary (none)
-This system has no secondary accent. Secondary decoration is prohibited.
-
-### Neutral
-- **Deep Black** (`#09090b`): Page background. The darkest surface; sets the stage.
-- **Surface** (`#18181b`): Card and panel backgrounds. One step lighter than the page — the primary content surface.
-- **Surface Raised** (`#27272a`): Interactive element fills (selects, mic button rest state, tuner bar track). Distinguishable from Surface without requiring a border.
-- **Border** (`#3f3f46`): Dividers, input outlines, card borders. Used at 1px — never as a decorative stripe.
-- **Text Primary** (`#f4f4f5`): All primary readable text. Body copy, note names, values.
-- **Text Secondary** (`#a1a1aa`): Supporting labels, secondary annotations.
-- **Text Muted** (`#71717a`): De-emphasized labels (uppercase tracking text, scale tick labels).
+A faint teal wash sits behind the header (`radial-gradient` at 10%) as atmosphere.
 
 ### Signal
-The signal colors carry the entire functional communication of the tuner. They are never decorative.
+The three signal colours carry the whole tuning conversation and stay identical in both themes:
 
-- **In-Tune Emerald** (`#10b981`): The target state. Active mic button, in-tune indicator, confirmed reading.
-- **Flat Sky** (`#38bdf8`): Pitch is below the target. The bar leans left; the label glows blue.
-- **Sharp Amber** (`#fbbf24`): Pitch is above the target. The bar leans right; the label glows amber.
-- **Error Red** (`#f87171`): Microphone access denied or hardware error. Permission display only.
-
-### Named Rules
-**The One Accent Rule.** Calibration Teal appears once per screen — in the logotype. It is not an interactive color, not a hover state, not a highlight. Its rarity makes it recognizable. Do not use `#2aab9e` anywhere else.
-
-**The Signal Monopoly Rule.** Emerald, sky, and amber exist only as tuner signal states. Do not use these colors for decorative purposes, success toasts, or any non-signal UI.
+- **Emerald `#10b981`** — in tune, mic on, a string marked tuned, the Strum button.
+- **Sky `#38bdf8`** — flat, and "locked" (the lock chip, a locked string with no reading).
+- **Amber `#fbbf24`** — sharp.
+- Text on light backgrounds uses darker inks of the same hues (`--flat-ink`, `--sharp-ink`, `--tuned-ink`) for contrast.
+- **Grey `#a1a1aa`** — provisional: the reading right after a pluck, before it has settled.
 
 ## 3. Typography
 
-**Display / Body / Label Font:** JetBrains Mono (with Fira Code, monospace fallback)
+- **Geist** for everything readable as UI: the note letter, labels, buttons, the wordmark.
+- **Geist Mono** for data: cents, Hz, the octave digit next to the note, the bar's scale, the header subtitle (`Standard · EADGBE`), the build hash, chord-diagram marks.
+- The note letter (84px, 500, −0.04em) is always the largest thing on screen; its octave sits beside it in 20px mono, muted.
+- No uppercase-tracked labels any more, except the small amber `MODIFIED` badge on a preset.
 
-**Character:** A single monospaced typeface used at all scales. This is intentional: the tuner displays numerical and musical data (note names, cent values, frequencies), and monospace ensures the data reads like instrument output, not UI copy. The constraint is the identity.
+## 4. Components
 
-### Hierarchy
-- **Display** (700, 3.75rem / 60px, line-height 1): The detected note name — "E4", "A3", "G#2". The hero of the screen. Used only for the live pitch readout.
-- **Title** (700, 1.125rem / 18px, line-height 1): The app name in the header logotype.
-- **Body** (400, 0.875rem / 14px, line-height 1.5): Option labels in selects, error messages, footer build info.
-- **Label** (400, 0.75rem / 12px, tracking 0.1em, uppercase): Section labels ("Instrument", "Tuning", "Microphone"). Uppercase + tracked to distinguish from body without using a different weight.
+### Tuner panel
+One card, 28px top corners, open at the bottom so the headstock's strings fade into the page. From the top:
 
-### Named Rules
-**The Mono-Only Rule.** No second typeface is ever introduced. Sans-serif, serif, and display faces are prohibited. The mono constraint carries the instrument aesthetic; breaking it breaks the identity.
+1. **Status row** — dot + `Mic off` / `Listening · Auto` / `Listening · E2`; on the right, one dot per string (emerald once tuned), `n/N` and a small reset button, shown only once something is tuned.
+2. **Reading** — note letter left; cents (signal-coloured, mono) and Hz right, plus "playing D#2" when the sounding note is not the target. With the mic off: a muted "–" and a "↑ Tap the mic" pill with a one-line hint.
+3. **Segment bar** — 25 rounded segments (22px tall, 3px gap) spanning ±`barRange`. The reading lights one segment in its signal colour with a glow, plus a translucent trail back to the centre. The in-tune zone is tinted faint emerald; in tune, the centre segment lights solid emerald. Ticks and mono labels at the ends and at ±40% of the range. Below it, one status line: `▲ Tune up`, `▼ Tune down`, `✓ In tune`, `✓ E2 tuned`, `···` while settling.
+4. **Headstock** (below).
 
-## 4. Elevation
+An emerald radial wash fades in at the top of the panel while in tune.
 
-This system uses **tonal layering**, not shadows. Depth is created by stepping through the neutral ramp (`bg-deep` → `surface` → `surface-raised`) rather than floating elements with box-shadows.
+### Headstock
+A flat, dark wood headstock (subtle horizontal gradient + top sheen), bone nut and metal pegs, cropped just below the nut. String buttons are plain circles outside the wood: rest `--btn-fill`/`--btn-stroke`; active tinted in the signal colour at 14–16% with a 1.5px stroke; locked in sky. The active string takes the reading's colour and trembles slightly until it is in tune. A tuned string keeps a faint emerald ring and a small dot under its label; the moment it is marked, one emerald ring pulses off its button.
 
-The tuner card sits on `surface` (`#18181b`) against the `bg-deep` (`#09090b`) page — one step of contrast, no blur. Interactive controls use `surface-raised` (`#27272a`) to sit one additional step above the card. The mic button active state (emerald) provides the only true elevation signal: a soft ambient glow (`box-shadow: 0 0 20px rgba(16, 185, 129, 0.25)`) that appears only when the microphone is live.
+### Mic button
+60px circle. Off: surface with a 1px border and a slow "breathing" halo, the one thing on screen that asks to be tapped. On: solid emerald with a 6px soft ring, an ambient glow and a ping.
 
-### Named Rules
-**The Flat-By-Default Rule.** Surfaces are flat at rest. The only permitted shadow is the emerald ambient glow on the active mic button — a functional signal, not decoration. Add no other shadows.
+### Chips and segmented controls
+- **Chip** (instrument, tuning, root, quality): 1px `line` border on `card`; selected = teal border + teal tint, ink text. Instrument and root chips are 12px-radius tiles in a grid; tuning chips are pills.
+- **Segmented** (Tuner | Chords, Browse | Pinned): a `well` track with 3px padding; the selected tab is a raised `tab-on` pill.
+- **Auto chip** next to the mic: `● Auto detect` at rest; locked, a sky-tinted pill with a lock and the string name.
 
-## 5. Components
+### Bottom sheets
+Menu, preset picker and install steps all slide up from the bottom: 28px top corners, `sheet` background, a grabber, 50% black backdrop with a 2px blur. The menu holds Tuner/Chords, instrument and tuning chips, and a grouped list (Settings, light/dark, Add to Home Screen, Buy me a coffee). The preset sheet lists presets as 56px rows with a description and a teal check. When the settings differ from the active preset, an amber-tinted box above the list offers Save / Save as… / Revert.
 
-### Tuner Bar
-The signature component. A thin, full-width horizontal track (`height: 16px, border-radius: 9999px`) in `surface-raised` with a circular indicator dot that moves left (flat/sky) or right (sharp/amber) from center. A subtle emerald zone (`±10%` width) marks the in-tune target. Tick marks at five positions (`−50, −25, 0, +25, +50` cents) are 1px wide, zinc-colored, never labeled with raw cent values — the `−10 … +10` display scale is shown in text below.
+### Chords
+Root chips in a 6×2 grid, quick-quality chips (Major, Minor, 7) plus a "More" select dressed as a chip, then a panel with the chord name at 56px, the diagram, the voicing pager, and a star button + an emerald "Strum" pill.
 
-- **Track:** `height: 16px`, `background: #27272a`, `border-radius: 9999px`
-- **Indicator:** `14px` circle, colored by signal state (zinc / emerald / sky / amber), `z-index` above ticks
-- **In-tune zone:** 14% width strip centered, `background: rgba(16,185,129,0.20)`, `border: 1px solid rgba(16,185,129,0.40)`
-- **State transitions:** `transition: colors 75ms` — fast enough to feel responsive, slow enough not to strobe
+### Header and footer
+Header: 30px icon + wordmark + mono subtitle, centred; a 40px square menu button on the right. Footer: `by SisQo · Buy me a coffee · <hash>` in `faint`, Ko-fi link in its own blue.
 
-### Mic Button
-A 40×40px circle. The primary call-to-action; centered below the selectors.
+### Icon
+The segment bar as a mark: seven rounded bars on `#16161a` (23% corner radius), greys stepping up to a tall teal centre bar. At 40px and below, three bars. Home-screen and maskable versions are full-bleed squares.
 
-- **Inactive:** `background: #27272a`, `border: 2px solid #3f3f46`, icon `#a1a1aa`
-- **Active:** `background: #10b981`, ambient glow, ping animation (opacity 30%), icon white
-- **No text label.** The mic icon alone is the affordance. Labels were removed deliberately.
-- **Hover:** Inactive → `#3f3f46`. Active → `#059669`.
+## 5. Motion
 
-### Select Controls (Instrument / Tuning)
-Identical visual treatment side-by-side in a 2-column grid.
-
-- **Background:** `#27272a`
-- **Border:** `1px solid #3f3f46`
-- **Border-radius:** `8px`
-- **Text:** `#f4f4f5`, `0.875rem`, JetBrains Mono
-- **Focus:** border shifts to `#52525b`; no glow, no outline ring
-- **Labels above:** `0.75rem`, uppercase, `letter-spacing: 0.1em`, `color: #71717a`
-
-### Header
-Centered logotype with absolute-positioned ThemeToggle on the right. Logo (40×40px, `border-radius: 12px`) + title ("Easy**Guitar**Tuner" where "Guitar" is `#2aab9e`). Subtitle "Chromatic tuner" in `text-muted`.
-
-### Headstock (Signature Component)
-An SVG diagram of the guitar or ukulele headstock with string buttons. String buttons are interactive: tap to lock a string for manual tuning. Active strings glow with the signal color. 12-string layout: bass courses (E, A, D) on the left side; treble courses (G, B, high-e) on the right.
-
-### Footer
-Single-line, centered, `text-muted`: build number and commit hash. Purely informational — invisible in use, present for diagnostics.
+Short and functional: segment fades (duration from `displaySmooth`, ~60ms), sheet slide-up (240ms), mic ping/breath, string tremble, tuned pulse (900ms). Everything that loops or pulses is off under `prefers-reduced-motion`.
 
 ## 6. Do's and Don'ts
 
-### Do:
-- **Do** use tonal layering (stepping through the neutral ramp) to create depth. No shadows except the mic button glow.
-- **Do** reserve signal colors (emerald, sky, amber, red) exclusively for tuner state communication.
-- **Do** use Calibration Teal (`#2aab9e`) only in the logotype. One instance per screen.
-- **Do** keep the note name (display type, 3.75rem) as the largest typographic element at all times.
-- **Do** use uppercase + letter-spacing only for section labels. Nowhere else.
-- **Do** ensure the tuner bar indicator transitions in ≤100ms so pitch feel real-time.
+**Do**
+- Use the Tailwind theme names (`bg-surface`, `border-line`, `text-muted`…) or the CSS variables, never a `zinc-*` + `dark:` pair.
+- Keep emerald, sky and amber for tuning state only (plus Strum and the mic, which are "go" actions).
+- Keep the note letter the largest element and the number next to it exact to the cent.
+- Put new secondary UI in a bottom sheet.
 
-### Don't:
-- **Don't** introduce a second typeface. JetBrains Mono is the only permitted font family.
-- **Don't** use `border-left` or `border-right` as a colored accent stripe on any component. Use background tints or full borders instead.
-- **Don't** add gradient text, glassmorphism blur, or any decorative layer not present in the current system.
-- **Don't** make this look like a SaaS dashboard: no metric cards, no sidebar navigation, no feature-section chrome, no platform-style layout.
-- **Don't** use the signal colors (emerald, sky, amber) for non-signal purposes — not for success banners, hover highlights, or decorative accents.
-- **Don't** add a second accent color. The system has one: Calibration Teal. Adding a second breaks the One Accent Rule and dilutes the identity.
-- **Don't** add shadows to cards or panels at rest. The Flat-By-Default Rule is absolute.
+**Don't**
+- Don't use teal to mean "in tune", or emerald for selection.
+- Don't add a third typeface, or set prose in mono.
+- Don't add shadows beyond the panel inset, the signal glows and the mic's ring.
+- Don't make it look like a dashboard: no metric cards, no sidebars.

@@ -30,14 +30,14 @@ export default defineConfig({
         name: 'EasyGuitarTuner',
         short_name: 'EasyTuner',
         description: 'Chromatic tuner for guitar and ukulele',
-        theme_color: '#09090b',
-        background_color: '#09090b',
+        theme_color: '#0b0b0d',
+        background_color: '#0b0b0d',
         display: 'standalone',
         orientation: 'portrait',
         icons: [
           { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
-          { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: '/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
       workbox: {

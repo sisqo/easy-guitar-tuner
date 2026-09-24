@@ -83,7 +83,7 @@ Stored in localStorage as `egt-settings`, version-gated by `SETTINGS_VERSION`. S
 | `diapason` | 440 | A4 reference Hz |
 | `inTuneThreshold` | 3 | In-tune zone (±cents) |
 | `barRange` | 25 | TunerBar full scale (±cents) |
-| `displaySmooth` | 0.22 | Needle glide only |
+| `displaySmooth` | 0.22 | Bar segment fade duration only |
 | `windowSize` | 8192 | `fftSize` — samples per analysis |
 | `hpFreq` | 55 | Highpass Hz |
 | `lpFreq` | 1200 | Lowpass Hz |
@@ -131,26 +131,40 @@ node scripts/pipeline-bench.mjs   # whole chain on simulated tuning sessions (th
 
 The synth accumulates phase per sample. An earlier version wrote `sin(2π·f(t)·t)`, whose instantaneous frequency carries a `t·f'(t)` term that read 4–5 cents flat for a few hundred ms — and was mistaken for detector bias. Do not verify precision in a headless browser: Chromium's fake capture device is not sample-accurate and adds a systematic offset of ~10 cents of its own. It is fine for *functional* checks (does the note switch, are there console errors) — use the real mic plus `debugOverlay` for anything about accuracy.
 
+### Theme and type
+
+Design source: the claude.ai/design project "Tuner Mobile 2a" + "Logo" (1a). Fonts are **Geist** (UI) and **Geist Mono** (numbers, subtitle, scale), loaded in `index.css`.
+
+Surface colours are CSS variables in `index.css` — one set on `:root` (light), redefined under `.dark` — and exposed to Tailwind as `canvas`, `surface`, `card`, `well`, `sheet`, `line`, `ink`, `ink-2`, `muted`, `faint`, `grabber`, `tab-on`, plus `brand` (`#2aab9e`). Use those instead of `zinc-*` + `dark:` pairs. SVG reads the same variables through `style` (`fill`, `stroke`, `stopColor`), so the headstock no longer needs a `dark` prop. Signal colours are literal and identical in both themes.
+
+The app icon is the tuner's segment bar: seven bars with the teal one in the middle (`public/icon-*.png`, `logo.png`), three bars at 40px and below (`AppLogo.jsx` in the header, the favicons). The apple-touch and `icon-maskable-512.png` versions are full-bleed squares — iOS and Android apply their own mask, and transparent corners turn black.
+
 ### Main layout (`App.jsx`)
 
+Header: `AppLogo` + wordmark + a mono subtitle (`Standard · EADGBE`, one letter per course on a 12-string; `Chords · Guitar 6` in the chords view), menu button on the right. Everything secondary opens as a **bottom sheet** (`BottomSheet.jsx`, which also exports `Chip` and `Segmented`): `MenuSheet` (Tuner/Chords tabs, instrument and tuning chips, Settings, light/dark, Add to Home Screen, Ko-fi), the preset picker and the iOS install steps. Settings stays a side panel.
+
 Stack order in `<main>`:
-1. **Mic button** + `AutoToggle` chip — primary action row (instrument and tuning are `<select>`s inside `HamburgerMenu`, not in the main stack)
-2. **`PresetSelector`** — the detection-preset chip and its popover. On the tuner screen rather than behind Settings because comparing two sets of parameters is only useful if it costs one tap with a guitar in your hands; saving and reverting live in the popover too, since walking to a side panel to keep a setting you just found is how you lose it. Its wrapper carries `z-30` so the popover covers the tuner card. `PresetManager` (rename, delete, and the same save/revert) sits at the top of `SettingsPanel`.
-3. **Tuner panel** — one card: empty state (mic off) or live `TunerBar`, then `InputLevel` (mic on), then `DebugOverlay` when enabled, then the tuned-string progress dots, then `GuitarHeadstock`
+1. **Mic button** + `AutoToggle` chip — primary action row
+2. **`PresetSelector`** — the detection-preset chip and its sheet. On the tuner screen rather than behind Settings because comparing two sets of parameters is only useful if it costs one tap with a guitar in your hands; saving and reverting live in the sheet too, since walking to a side panel to keep a setting you just found is how you lose it. `PresetManager` (rename, delete, and the same save/revert) sits at the top of `SettingsPanel`.
+3. **Tuner panel** — one card open at the bottom: status row (`Mic off` / `Listening · Auto` / `Listening · E2`, and on the right the tuned-string dots, `n/N` and a reset button), `TunerBar` (which also draws the mic-off empty state), `InputLevel` (mic on), `DebugOverlay` when enabled, then `GuitarHeadstock`. A green wash fades in at the top while in tune.
+
+The footer is a plain link row (`by SisQo · Buy me a coffee · <hash>`); the Ko-fi widget script is gone.
 
 `GuitarHeadstock` is wrapped in `React.memo` — it is the heaviest node in the tree, and it must not re-render on every reading. That is why `handleLockToggle` is a `useCallback`; a fresh identity there would defeat the memo.
 
 ### AutoToggle
 
 Inline chip component in `App.jsx` (not a separate file). Reads `lockedStringId`:
-- `null` → shows `● Auto` (green dot)
+- `null` → shows `● Auto detect` (green dot)
 - non-null → shows lock icon + string label (e.g. `E2`)
 
 Tap when locked → `handleLockToggle(lockedStringId)` (unlocks). Tap when auto + active string → `handleLockToggle(activeStringId)` (locks). Updates automatically when user taps a headstock button.
 
 ### Tuned markers
 
-When the beep fires (`beepFiredRef.current = true`), the active `stringId` is added to `tunedStrings` (a `Set`). `GuitarHeadstock` receives this set via the `tunedStrings` prop. A string with `tunedStrings.has(id) && !isActive` shows an emerald ring + `✓` checkmark (upper-right of button circle, animated with `.marker-appear` CSS keyframe in `index.css`). Cleared on mic stop, instrument change, or tuning change.
+When the beep fires (the dwell timer in `App.jsx`), the active string and its same-frequency companions are added to `tunedStrings` (a `Set`). `GuitarHeadstock` receives this set via the `tunedStrings` prop. A string with `tunedStrings.has(id) && !isActive` gets a faint emerald ring and a small emerald dot under its label (`.marker-appear`). Cleared on mic stop, instrument change, tuning change, or the reset button in the panel's status row.
+
+The first time a string is marked, App also sets `tunedFlash` for `TUNED_FLASH_MS`: `TunerBar` says "✓ E2 tuned" instead of "✓ In tune", and the headstock plays one ring (`.egt-pulse`) off that button. It hangs off the same timer as the beep — there is no second dwell clock — and reads `tunedStrings` through a ref, because as an effect dependency marking a string would restart the timer and beep again.
 
 ### Tuning data (`src/data/tunings.js`)
 
@@ -163,13 +177,13 @@ String ordering in arrays: **lowest pitch first** (index 0 = thickest string). T
 `LAYOUTS` keyed by string count (4 / 6 / 12). Each layout defines:
 - `leftIndices` / `rightIndices` — which string indices appear on each side, **top-to-bottom**
 - `nutXs` — x positions of each string at the nut
-- `leftPegs` / `rightPegs` — peg `{x, y}` coordinates
+- `leftPegs` / `rightPegs` — peg `[x, y]` coordinates
 
-String routing uses cubic Bézier paths from nut to peg. Buttons sit outside the headstock rect (at `leftBtnX` / `rightBtnX`) and trigger `onStringSelect(stringId)` to toggle the lock.
+String routing uses cubic Bézier paths from nut to peg. The view is cropped `CROP` (97) units below the nut, and a gradient fades the strings into the panel. Buttons sit outside the headstock rect (at `leftBtnX` / `rightBtnX`) and trigger `onStringSelect(stringId)` to toggle the lock; their labels are HTML spans laid over the SVG (percent positions), so they render in Geist.
 
-**Visual**: headstock uses a maple wood gradient (`wood-h`) + grain pattern (`woodgrain`) + gloss varnish (`wood-shine`). Nut is bone/ivory. All SVG colors are conditional on the `dark` prop (passed from App.jsx) since Tailwind can't reach inside SVG.
+**Visual**: flat, dark wood gradient (`--wood-0` / `--wood-1`) with a top sheen, a flat bone nut, metal pegs. The active string takes the reading's colour (`signal` prop: App's `emerald`/`amber`/`sky`/`zinc`, or `null` with nothing measured; locked-without-reading is sky) and trembles (`egt-vib`) until in tune. `signal` only changes when the reading crosses zero or settles, so the memo still skips nearly every reading. All animations are off under `prefers-reduced-motion`.
 
-**12-string layout**: bass courses (E, A, D) on the left; treble courses (G, B, high e) on the right. Within each course pair the lower-pitched string is listed first (top peg).
+**12-string layout**: bass courses (E, A, D) on the left; treble courses (G, B, high e) on the right. Within each course pair the lower-pitched string is listed first (top peg). Courses sit in tight pairs at the nut; on the bass side each pair's octave string is the outer one, so the string going to the upper peg is the inner one and the two never cross.
 
 ### Add to Home Screen (`useInstallPrompt`)
 
@@ -179,11 +193,11 @@ Hook captures `beforeinstallprompt` (Android Chrome), detects iOS Safari (`/ipho
 
 `TunerBar` reads out **real cents, to the cent**, and both the bar and its labels span ±`barRange` (default 25). It used to show `Math.round(cents / 5)` on a fixed ±50 bar, which meant a string three cents out looked perfectly in tune — half of "not as precise as other tuners" was this, not the detector.
 
-The needle is a CSS `left` transition retargeted on each update; `displaySmooth` only sets its duration. All the real smoothing happens in `pitchTracker`, so the number, the colour and the dot describe the same value.
+The bar is **25 segments**, each `2 × barRange / 25` cents wide (2¢ at the default), with ticks and labels at ±`barRange` and ±`round(0.4 × barRange)`. The lit segment is the reading, with a translucent trail back to the centre; in tune, the centre segment lights green. The in-tune zone is tinted over the segments within `zoneCents` — the width the latched verdict is using, hysteresis included. `displaySmooth` now only sets how fast a segment fades between states. All the real smoothing happens in `pitchTracker`, so the number, the colour and the lit segment describe the same value.
 
 **The letter is the target string**, not the chromatic name of the pitch: the cents are measured against that string (auto or locked), so the two must share a reference. A low E 60¢ flat used to read "D#2" next to "−60". When the sounding note differs, `TunerBar` adds a small "playing D#2" (`soundingNote`).
 
-**Settling**: `usePitchDetector` publishes `settling` — the detector's `fresh` period (~1.5 windows after a pluck) while a note is shown. During it `TunerBar` keeps the needle moving but grey, with `···` instead of an instruction. The window smears the sharp attack over ~250 ms (a synthetic E4 reads +23¢ at 131 ms when the string itself is at +5¢), so without this every pluck said "▼ tune down" first.
+**Settling**: `usePitchDetector` publishes `settling` — the detector's `fresh` period (~1.5 windows after a pluck) while a note is shown. During it `TunerBar` keeps the segment moving but grey, with `···` instead of an instruction. The window smears the sharp attack over ~250 ms (a synthetic E4 reads +23¢ at 131 ms when the string itself is at +5¢), so without this every pluck said "▼ tune down" first.
 
 **`InputLevel`**: a small RMS meter (dBFS, with a tick at the current noise gate) polling `statsRef` on its own clock like `DebugOverlay`, so it re-renders only itself. After 600 ms of `gate: 'clarity'` with no note it says "sound, but no clear note" — the case that otherwise looks identical to silence.
 

@@ -146,10 +146,10 @@ export default function SettingsPanel({ open, onClose, settings, update, resetAl
   return (
     <>
       {open && (
-        <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+        <div className="fixed inset-0 z-[95] bg-black/40 backdrop-blur-sm" onClick={onClose} />
       )}
 
-      <div className={`fixed top-0 right-0 h-full z-50 w-full max-w-sm bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-800 flex flex-col transition-transform duration-300 ease-out ${open ? 'translate-x-0' : 'translate-x-full'}`}>
+      <div className={`fixed top-0 right-0 h-full z-[100] w-full max-w-sm bg-sheet border-l border-line flex flex-col transition-transform duration-300 ease-out ${open ? 'translate-x-0' : 'translate-x-full'}`}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-200 dark:border-zinc-800">
           <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">Settings</h2>
@@ -198,15 +198,15 @@ export default function SettingsPanel({ open, onClose, settings, update, resetAl
               value={settings.barRange}
               options={[{ value: 15, label: '±15 ¢' }, { value: 25, label: '±25 ¢' }, { value: 50, label: '±50 ¢' }]}
               description="Full scale of the bar"
-              info="How many cents the full width of the bar covers. A narrower range magnifies small errors — at ±25 the needle travels twice as far for the same three cents as it did at ±50, which is what makes fine tuning visible at all."
+              info="How many cents the full width of the bar covers. A narrower range magnifies small errors — at ±25 the lit segment moves twice as far for the same three cents as it did at ±50, which is what makes fine tuning visible at all."
               update={update}
             />
             <Slider
               label="Bar smoothing" settingKey="displaySmooth"
               value={settings.displaySmooth} min={0.05} max={0.40} step={0.01}
               format={v => v.toFixed(2)}
-              description="Needle fluidity"
-              info="Controls how fluidly the needle glides. This is purely visual — the detector has already smoothed the pitch — so higher values simply track the reading more closely."
+              description="Bar fluidity"
+              info="Controls how quickly the bar's segments fade from one reading to the next. This is purely visual — the detector has already smoothed the pitch — so higher values simply follow the reading more closely."
               update={update}
             />
           </section>
@@ -294,7 +294,7 @@ export default function SettingsPanel({ open, onClose, settings, update, resetAl
                 value={settings.smoothFactorFast} min={0.20} max={0.80} step={0.05}
                 format={v => v.toFixed(2)}
                 description="While a peg is turning"
-                info="Smoothing used while the pitch is actually travelling. Keeping this separate is what lets the needle answer a peg turn immediately without becoming jittery once the string is parked."
+                info="Smoothing used while the pitch is actually travelling. Keeping this separate is what lets the bar answer a peg turn immediately without becoming jittery once the string is parked."
                 update={update}
               />
               <Slider

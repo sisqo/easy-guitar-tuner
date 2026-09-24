@@ -9,14 +9,15 @@ import { useInstallPrompt } from './hooks/useInstallPrompt'
 import { getTunings } from './data/tunings'
 import { DEFAULT_PRESET_ID } from './data/settings'
 import { findClosestString, freqToNoteName, getCents } from './utils/noteUtils'
-import HamburgerMenu from './components/HamburgerMenu'
+import MenuSheet from './components/MenuSheet'
+import BottomSheet from './components/BottomSheet'
+import AppLogo from './components/AppLogo'
 import TunerBar from './components/TunerBar'
 import GuitarHeadstock from './components/GuitarHeadstock'
 import MicButton from './components/MicButton'
 import SettingsPanel from './components/SettingsPanel'
 import PresetSelector from './components/PresetSelector'
 import ChordsView from './components/ChordsView'
-import KofiButton from './components/KofiButton'
 import DebugOverlay from './components/DebugOverlay'
 import InputLevel from './components/InputLevel'
 
@@ -29,6 +30,9 @@ const IN_TUNE_BEEP_MS = 900
 // emerald ring is an SVG attribute with no CSS transition, so without hysteresis a
 // string parked on the edge of the zone makes it strobe.
 const HYSTERESIS_CENTS = 2
+
+// How long "✓ E2 tuned" replaces the instruction, and the button's ring plays
+const TUNED_FLASH_MS = 1400
 
 function AutoToggle({ lockedStringId, activeStringId, strings, onToggle }) {
   const isLocked = lockedStringId !== null
@@ -46,27 +50,25 @@ function AutoToggle({ lockedStringId, activeStringId, strings, onToggle }) {
     <button
       onClick={handleClick}
       aria-label={isLocked ? `Locked to ${lockedString?.label ?? 'string'} — tap to switch to Auto` : 'Auto mode — tap a string or here to lock'}
-      className={`group relative rounded-full flex items-center gap-2 shrink-0 border transition-all duration-200 ease-out active:scale-[0.97] cursor-pointer ${
+      className={`h-10 px-3.5 rounded-full flex items-center gap-2 shrink-0 border text-[13px] whitespace-nowrap transition-colors cursor-pointer active:scale-[0.97] ${
         isLocked
-          ? 'h-11 px-4 font-semibold text-sm bg-gradient-to-b from-sky-50 to-sky-100 border-sky-200 text-sky-700 dark:from-sky-950/70 dark:to-sky-950/40 dark:border-sky-800/80 dark:text-sky-300'
-          : 'h-9 px-3 font-medium text-xs border-zinc-200 text-zinc-400 dark:border-zinc-700 dark:text-zinc-600 hover:border-zinc-300 hover:text-zinc-500 dark:hover:border-zinc-600 dark:hover:text-zinc-500'
+          ? 'font-semibold border-sky-400/45 bg-sky-400/10'
+          : 'font-medium border-line bg-surface text-ink-2 hover:text-ink'
       }`}
+      style={isLocked ? { color: 'var(--lock-fg)' } : undefined}
     >
-      {isLocked && (
-        <span className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-b from-white/20 to-transparent" />
-      )}
       {isLocked ? (
         <>
-          <svg xmlns="http://www.w3.org/2000/svg" className="relative w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+          <svg className="w-[13px] h-[13px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
           </svg>
-          <span className="relative">{lockedString?.label ?? '—'}</span>
+          {lockedString?.label ?? '—'}
         </>
       ) : (
         <>
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/70 shrink-0" />
-          <span>Auto detect</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+          Auto detect
         </>
       )}
     </button>
@@ -79,7 +81,10 @@ export default function App() {
   const [tuningKey, setTuningKey] = useLocalStorage('egt-tuning', 'standard')
   const [lockedStringId, setLockedStringId] = useState(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const [tunedStrings, setTunedStrings] = useState(() => new Set())
+  // { stringId, label, key } for TUNED_FLASH_MS after a string is first marked tuned
+  const [tunedFlash, setTunedFlash] = useState(null)
   const [iosSheetOpen, setIosSheetOpen] = useState(false)
   // Chords section — view always opens on the tuner; chord selection persists for the session
   const [view, setView] = useState('tuner')
@@ -124,10 +129,18 @@ export default function App() {
   const { playNote, playChord } = useOscillator()
   const { beep } = useSuccessBeep()
 
+  const resetTuned = useCallback(() => {
+    setTunedStrings(new Set())
+    setTunedFlash(null)
+  }, [])
+
   const handleStop = useCallback(() => {
     stop()
-    setTunedStrings(new Set())
-  }, [stop])
+    resetTuned()
+  }, [stop, resetTuned])
+
+  const closeMenu = useCallback(() => setMenuOpen(false), [])
+  const closeIosSheet = useCallback(() => setIosSheetOpen(false), [])
 
   // Switching to Chords stops the mic (you're not tuning) to save battery
   const handleViewChange = useCallback((v) => {
@@ -139,12 +152,12 @@ export default function App() {
     setInstrument(id)
     setTuningKey('standard')
     setLockedStringId(null)
-    setTunedStrings(new Set())
+    resetTuned()
   }
   function handleTuningChange(key) {
     setTuningKey(key)
     setLockedStringId(null)
-    setTunedStrings(new Set())
+    resetTuned()
   }
   // useCallback so the memoized GuitarHeadstock actually gets to skip renders:
   // a fresh function identity here would defeat it on every pitch update.
@@ -214,178 +227,233 @@ export default function App() {
   // render left to poll on. The cleanup also means the dwell restarts by itself
   // whenever the string, the note or the in-tune verdict changes — a string that
   // was already in tune no longer hands its elapsed time to the next one.
+  // Read through a ref: as a dependency, marking a string tuned would restart the
+  // dwell timer and beep again 900 ms later.
+  const tunedRef = useRef(tunedStrings)
+  useEffect(() => { tunedRef.current = tunedStrings }, [tunedStrings])
+
   useEffect(() => {
     if (!inTune || !displayNote) return
     const id = setTimeout(() => {
       beep()
       if (activeStringId !== null) {
         // Mark all same-frequency strings as tuned (covers unison pairs like B3/B3')
-        const aFreq = strings.find(s => s.id === activeStringId)?.freq
-        const companions = strings.filter(s => aFreq != null && Math.abs(s.freq - aFreq) < 0.01).map(s => s.id)
+        const active = strings.find(s => s.id === activeStringId)
+        const companions = strings.filter(s => active && Math.abs(s.freq - active.freq) < 0.01).map(s => s.id)
+        if (!tunedRef.current.has(activeStringId)) {
+          setTunedFlash({ stringId: activeStringId, label: active.label, key: Date.now() })
+        }
         setTunedStrings(prev => { const next = new Set(prev); companions.forEach(cid => next.add(cid)); return next })
       }
     }, IN_TUNE_BEEP_MS)
     return () => clearTimeout(id)
   }, [inTune, displayNote, activeStringId, beep, strings])
 
+  useEffect(() => {
+    if (!tunedFlash) return
+    const id = setTimeout(() => setTunedFlash(null), TUNED_FLASH_MS)
+    return () => clearTimeout(id)
+  }, [tunedFlash])
+
+  // The reading's colour, for the headstock. It changes only when the reading
+  // crosses zero or settles, so the memoized headstock still skips nearly every
+  // reading.
+  const signal = !displayNote ? null : inTune ? 'emerald' : settling ? 'zinc' : displayCents > 0 ? 'amber' : 'sky'
+
+  const tuning = instrumentData.tunings[safeTuningKey]
+  // "Standard · EADGBE": for a 12-string, one letter per course
+  const subtitle = view === 'chords'
+    ? `Chords · ${instrumentData.label}`
+    : `${tuning.label.split('(')[0].trim()} · ${(strings.length === 12 ? strings.filter((_, j) => j % 2 === 0) : strings)
+        .map(s => s.note.replace('#', '♯')).join('')}`
+  const lockedLabel = lockedStringId !== null ? strings.find(s => s.id === lockedStringId)?.label ?? null : null
+
+
+  const showTuned = isListening && tunedStrings.size > 0
+
   return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 flex flex-col">
-      {/* Ambient stage-light wash from the top — atmosphere, not chrome */}
+    <div className="relative min-h-screen bg-canvas text-ink flex flex-col transition-colors duration-200">
+      {/* A faint teal wash from the top — atmosphere, not chrome */}
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed inset-0 z-0"
-        style={{
-          background: dark
-            ? 'radial-gradient(115% 50% at 50% -8%, rgba(255,255,255,0.05), transparent 60%)'
-            : 'radial-gradient(115% 50% at 50% -8%, rgba(255,255,255,0.7), transparent 55%)',
-        }}
+        className="pointer-events-none absolute inset-0"
+        style={{ background: 'radial-gradient(120% 45% at 50% -10%, rgba(42,171,158,0.10), transparent 60%)' }}
       />
-      <header className="relative z-20 flex items-center justify-center px-4 py-3">
-        <div className="flex items-center gap-4">
-          <img src="/logo.png" alt="" className="w-10 h-10 rounded-xl" />
-          <div>
-            <h1 className="text-lg font-bold tracking-tight text-zinc-900 dark:text-zinc-100 leading-none" aria-label="Easy Guitar Tuner">
-              Easy<span style={{ color: '#2aab9e' }}>Guitar</span>Tuner
-            </h1>
-            <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5 tracking-wide">
-              {instrumentData.tunings[safeTuningKey].label.split('(')[0].trim()}
-            </p>
-          </div>
-        </div>
-        <div className="absolute right-4 top-1/2 -translate-y-1/2">
-          <HamburgerMenu
-            dark={dark}
-            onToggleTheme={() => setDark(d => !d)}
-            onOpenSettings={() => setSettingsOpen(true)}
-            showInstallOption={showInstallOption}
-            onInstall={handleInstall}
-            instrument={instrument}
-            instruments={instrumentOptions}
-            onInstrumentChange={handleInstrumentChange}
-            tuningKey={safeTuningKey}
-            tunings={instrumentData.tunings}
-            onTuningChange={handleTuningChange}
-            view={view}
-            onViewChange={handleViewChange}
-          />
-        </div>
-      </header>
-
-      <main className="relative z-10 flex-1 flex flex-col gap-3 px-4 py-3 max-w-lg mx-auto w-full">
-        {view === 'chords' ? (
-          <ChordsView
-            instrument={instrument}
-            diapason={settings.diapason}
-            dark={dark}
-            playChord={playChord}
-            root={chordRoot}
-            suffix={chordSuffix}
-            onRootChange={setChordRoot}
-            onSuffixChange={setChordSuffix}
-          />
-        ) : (
-        <>
-        {/* Primary controls — mic + auto, side by side and harmonised */}
-        <div className="flex items-center justify-center gap-3 py-1">
-          <MicButton listening={isListening} onStart={start} onStop={handleStop} />
-          <AutoToggle
-            lockedStringId={lockedStringId}
-            activeStringId={activeStringId}
-            strings={strings}
-            onToggle={handleLockToggle}
-          />
-        </div>
-        {/* Detection preset — one tap to compare two configurations mid-session */}
-        <div className="relative z-30">
-          <PresetSelector
-            presets={preset.presets}
-            activeId={preset.activeId}
-            active={preset.active}
-            dirty={preset.dirty}
-            suggestedName={preset.suggestedName}
-            onSelect={preset.selectPreset}
-            onSave={preset.saveActive}
-            onSaveAs={preset.saveAs}
-            onRevert={preset.revert}
-          />
-        </div>
-        {error && (
-          <p className="-mt-1 text-center text-xs text-red-500 dark:text-red-400 leading-snug">
-            {error === 'Microphone access denied.'
-              ? 'Mic access denied. Allow it in browser settings and try again.'
-              : <>{error}{' '}<button onClick={() => window.location.reload()} className="underline underline-offset-2 cursor-pointer">Reload the page</button></>}
-          </p>
-        )}
-
-        {/* One tuner panel: readout + headstock on a single blueprint grid */}
-        <div
-          className="rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden"
-          style={{
-            backgroundColor: dark ? '#09090b' : '#f4f4f5',
-            backgroundImage: `linear-gradient(${dark ? 'rgba(255,255,255,0.05)' : 'rgba(24,24,32,0.05)'} 1px, transparent 1px), linear-gradient(90deg, ${dark ? 'rgba(255,255,255,0.05)' : 'rgba(24,24,32,0.05)'} 1px, transparent 1px)`,
-            backgroundSize: '24px 24px',
-          }}
-        >
-          <div className="px-5 pt-5 pb-2">
-            {!isListening && !displayNote ? (
-              <div className="flex flex-col items-center justify-center py-2 gap-1">
-                <span className="text-6xl font-bold leading-none tabular-nums text-zinc-200 dark:text-zinc-800 select-none">–</span>
-                <p className="text-sm text-zinc-400 dark:text-zinc-600 tracking-wide">Tap to start tuning</p>
-              </div>
-            ) : (
-              <TunerBar
-                cents={displayCents}
-                note={displayNote}
-                soundingNote={soundingNote}
-                settling={settling}
-                freq={pitch}
-                inTune={inTune}
-                zoneCents={zoneCents}
-                displaySmooth={settings.displaySmooth}
-                barRange={settings.barRange}
-              />
-            )}
-            {isListening && <InputLevel statsRef={statsRef} hasNote={displayNote !== null} />}
-            {settings.debugOverlay && isListening && <DebugOverlay statsRef={statsRef} />}
-          </div>
-
-          {isListening && tunedStrings.size > 0 && (
-            <div className="px-5 pb-2 flex items-center gap-2">
-              <div className="flex gap-1">
-                {strings.map(s => (
-                  <span
-                    key={s.id}
-                    className={`w-1.5 h-1.5 rounded-full transition-colors duration-300 ${tunedStrings.has(s.id) ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-700'}`}
-                  />
-                ))}
-              </div>
-              <span className="text-[10px] text-zinc-400 dark:text-zinc-600 tabular-nums">
-                {tunedStrings.size}/{strings.length}
-              </span>
+      <div className="relative flex-1 flex flex-col w-full max-w-lg mx-auto">
+        <header className="relative z-40 flex items-center justify-center px-5 pb-2.5 pt-[calc(16px+env(safe-area-inset-top))] min-h-[66px]">
+          <div className="flex items-center gap-2.5">
+            <AppLogo size={30} />
+            <div className="flex flex-col gap-[3px]">
+              <h1 className="text-base font-semibold tracking-[-0.02em] leading-none whitespace-nowrap" aria-label="Easy Guitar Tuner">
+                Easy<span className="text-brand">Guitar</span>Tuner
+              </h1>
+              <span className="font-mono text-[11px] text-muted leading-none whitespace-nowrap">{subtitle}</span>
             </div>
-          )}
+          </div>
+          <div className="absolute right-5 bottom-2.5">
+            <button
+              onClick={() => setMenuOpen(true)}
+              aria-label="Menu"
+              aria-haspopup="dialog"
+              className="w-10 h-10 rounded-xl border border-line bg-surface text-ink-2 hover:text-ink flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 9h16M4 15h16" /></svg>
+            </button>
+          </div>
+        </header>
 
-          <GuitarHeadstock
-            strings={strings}
-            activeStringId={activeStringId}
-            activeFreq={activeFreq}
-            lockedStringId={lockedStringId}
-            onStringSelect={handleLockToggle}
-            onPlay={playNote}
-            dark={dark}
-            inTune={inTune}
-            tunedStrings={tunedStrings}
-          />
-        </div>
-        </>
+        {view === 'chords' ? (
+          <main className="relative flex-1 flex flex-col gap-3.5 px-4 pt-3.5 pb-4">
+            <ChordsView
+              instrument={instrument}
+              diapason={settings.diapason}
+              dark={dark}
+              playChord={playChord}
+              root={chordRoot}
+              suffix={chordSuffix}
+              onRootChange={setChordRoot}
+              onSuffixChange={setChordSuffix}
+            />
+          </main>
+        ) : (
+          <main className="relative flex-1 flex flex-col gap-3.5 px-4 pt-3.5">
+            {/* Primary controls — mic + auto */}
+            <div className="flex items-center justify-center gap-3 min-h-[60px]">
+              <MicButton listening={isListening} onStart={start} onStop={handleStop} />
+              <AutoToggle
+                lockedStringId={lockedStringId}
+                activeStringId={activeStringId}
+                strings={strings}
+                onToggle={handleLockToggle}
+              />
+            </div>
+            {/* Detection preset — one tap to compare two configurations mid-session */}
+            <PresetSelector
+              presets={preset.presets}
+              activeId={preset.activeId}
+              active={preset.active}
+              dirty={preset.dirty}
+              suggestedName={preset.suggestedName}
+              onSelect={preset.selectPreset}
+              onSave={preset.saveActive}
+              onSaveAs={preset.saveAs}
+              onRevert={preset.revert}
+            />
+            {error && (
+              <p className="-mt-1 text-center text-xs text-red-500 dark:text-red-400 leading-snug">
+                {error === 'Microphone access denied.'
+                  ? 'Mic access denied. Allow it in browser settings and try again.'
+                  : <>{error}{' '}<button onClick={() => window.location.reload()} className="underline underline-offset-2 cursor-pointer">Reload the page</button></>}
+              </p>
+            )}
+
+            {/* One tuner panel: readout on top, headstock below, open at the bottom */}
+            <div
+              className="relative flex-1 flex flex-col overflow-hidden rounded-t-[28px] border border-b-0"
+              style={{
+                background: 'linear-gradient(to bottom, var(--panel-from), var(--bg) 75%)',
+                borderColor: 'var(--panel-line)',
+                boxShadow: 'var(--panel-inset)',
+              }}
+            >
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 transition-opacity duration-300"
+                style={{ background: 'radial-gradient(90% 40% at 50% 0%, rgba(16,185,129,0.14), transparent 70%)', opacity: inTune ? 1 : 0 }}
+              />
+              <div className="relative px-[22px] pt-[18px] pb-1.5 flex flex-col gap-3">
+                <div className="flex items-center justify-between gap-3 h-6">
+                  <span className="flex items-center gap-2 min-w-0 text-sm font-medium text-ink-2 whitespace-nowrap">
+                    <span className="w-2 h-2 shrink-0 rounded-full" style={{ background: isListening ? '#10b981' : 'var(--note-idle)' }} />
+                    <span className="truncate">{isListening ? `Listening · ${lockedLabel ?? 'Auto'}` : 'Mic off'}</span>
+                  </span>
+                  <div
+                    className="flex items-center gap-2 shrink-0 transition-opacity"
+                    style={{ opacity: showTuned ? 1 : 0, pointerEvents: showTuned ? 'auto' : 'none' }}
+                    aria-hidden={!showTuned}
+                  >
+                    {/* Twelve dots at full size do not fit beside the status on a phone */}
+                    <div className={`flex ${strings.length > 6 ? 'gap-[3px]' : 'gap-[5px]'}`}>
+                      {strings.map(s => (
+                        <span key={s.id} className={`${strings.length > 6 ? 'w-[5px] h-[5px]' : 'w-[7px] h-[7px]'} rounded-full transition-colors duration-300`}
+                          style={{ background: tunedStrings.has(s.id) ? '#10b981' : 'var(--btn-stroke)' }} />
+                      ))}
+                    </div>
+                    <span className="font-mono text-sm text-ink-2 tabular-nums">{tunedStrings.size}/{strings.length}</span>
+                    <button
+                      onClick={resetTuned}
+                      aria-label="Reset tuned strings"
+                      title="Reset"
+                      className="w-6 h-6 ml-0.5 rounded-full border border-line bg-surface text-ink-2 hover:text-ink flex items-center justify-center cursor-pointer"
+                    >
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></svg>
+                    </button>
+                  </div>
+                </div>
+
+                <TunerBar
+                  listening={isListening}
+                  cents={displayCents}
+                  note={displayNote}
+                  targetLabel={isListening ? lockedLabel?.replace(/[ʼˡ]/g, '') ?? null : null}
+                  soundingNote={soundingNote}
+                  settling={settling}
+                  freq={pitch}
+                  inTune={inTune}
+                  zoneCents={zoneCents}
+                  displaySmooth={settings.displaySmooth}
+                  barRange={settings.barRange}
+                  flashLabel={tunedFlash?.label ?? null}
+                />
+                {isListening && <InputLevel statsRef={statsRef} hasNote={displayNote !== null} />}
+                {settings.debugOverlay && isListening && <DebugOverlay statsRef={statsRef} />}
+              </div>
+
+              <div className="relative flex-1 flex items-center justify-center px-2 pt-1 pb-5">
+                <GuitarHeadstock
+                  strings={strings}
+                  activeStringId={activeStringId}
+                  activeFreq={activeFreq}
+                  lockedStringId={lockedStringId}
+                  onStringSelect={handleLockToggle}
+                  onPlay={playNote}
+                  inTune={inTune}
+                  signal={signal}
+                  listening={isListening}
+                  tunedStrings={tunedStrings}
+                  flash={tunedFlash}
+                />
+              </div>
+            </div>
+          </main>
         )}
-      </main>
 
-      <KofiButton />
+        <footer className="relative flex justify-center gap-3.5 pt-3.5 pb-[calc(20px+env(safe-area-inset-bottom))] text-xs text-faint whitespace-nowrap">
+          <a href="https://www.sisqo.dev" target="_blank" rel="noopener noreferrer" className="hover:text-ink-2 transition-colors">by SisQo</a>
+          <span>·</span>
+          <a href="https://ko-fi.com/sisqo" target="_blank" rel="noopener noreferrer" className="text-[#72a4f2] hover:opacity-80 transition-opacity">Buy me a coffee</a>
+          <span>·</span>
+          <span className="font-mono">{__BUILD_HASH__}</span>
+        </footer>
+      </div>
 
-      <footer className="text-center text-sm text-zinc-500/80 dark:text-zinc-500/60 py-3 tracking-wide">
-        by <a href="https://www.sisqo.dev" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-700 dark:hover:text-zinc-400 transition-colors">SisQo</a> &nbsp;·&nbsp; <span className="font-mono">{__BUILD_HASH__}</span>
-      </footer>
+      <MenuSheet
+        open={menuOpen}
+        onClose={closeMenu}
+        dark={dark}
+        onToggleTheme={() => setDark(d => !d)}
+        onOpenSettings={() => setSettingsOpen(true)}
+        showInstallOption={showInstallOption}
+        onInstall={handleInstall}
+        instrument={instrument}
+        instruments={instrumentOptions}
+        onInstrumentChange={handleInstrumentChange}
+        tuningKey={safeTuningKey}
+        tunings={instrumentData.tunings}
+        onTuningChange={handleTuningChange}
+        view={view}
+        onViewChange={handleViewChange}
+      />
 
       <SettingsPanel
         open={settingsOpen}
@@ -396,58 +464,49 @@ export default function App() {
         preset={preset}
       />
 
-      {iosSheetOpen && (
-        <>
-          <div
-            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
-            onClick={() => setIosSheetOpen(false)}
-          />
-          <div className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-zinc-900 rounded-t-2xl border-t border-zinc-200 dark:border-zinc-800 px-6 pt-5 pb-8 max-w-lg mx-auto">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">Add to Home Screen</h2>
-              <button
-                onClick={() => setIosSheetOpen(false)}
-                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+      <BottomSheet open={iosSheetOpen} onClose={closeIosSheet} label="Add to Home Screen">
+        <div className="flex items-center justify-between px-1">
+          <h2 className="text-base font-semibold tracking-tight">Add to Home Screen</h2>
+          <button
+            onClick={closeIosSheet}
+            aria-label="Close"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-muted hover:text-ink hover:bg-well transition-colors cursor-pointer"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <ol className="flex flex-col gap-4 px-1">
+          <li className="flex items-start gap-3">
+            <span className="w-6 h-6 rounded-full bg-brand text-white text-xs font-semibold flex items-center justify-center shrink-0 mt-0.5">1</span>
+            <div className="flex-1">
+              <p className="text-sm text-ink-2 leading-snug">
+                Tap the <strong className="text-ink font-semibold">Share</strong> button in the Safari toolbar
+              </p>
+              <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-card border border-line">
+                <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                 </svg>
-              </button>
+                <span className="text-xs text-muted">Share</span>
+              </div>
             </div>
-            <ol className="flex flex-col gap-4">
-              <li className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-[#2aab9e] text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
-                <div className="flex-1">
-                  <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-snug">
-                    Tap the <strong className="text-zinc-900 dark:text-zinc-100">Share</strong> button in the Safari toolbar
-                  </p>
-                  <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                    </svg>
-                    <span className="text-xs text-zinc-500 dark:text-zinc-400">Share</span>
-                  </div>
-                </div>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-[#2aab9e] text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
-                <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-snug pt-0.5">
-                  Scroll down and tap <strong className="text-zinc-900 dark:text-zinc-100">Add to Home Screen</strong>
-                </p>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-[#2aab9e] text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
-                <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-snug pt-0.5">
-                  Tap <strong className="text-zinc-900 dark:text-zinc-100">Add</strong> to confirm
-                </p>
-              </li>
-            </ol>
-            <p className="mt-5 text-xs text-zinc-400 dark:text-zinc-600">
-              Open this page in Safari if you don't see the Share button.
+          </li>
+          <li className="flex items-start gap-3">
+            <span className="w-6 h-6 rounded-full bg-brand text-white text-xs font-semibold flex items-center justify-center shrink-0 mt-0.5">2</span>
+            <p className="text-sm text-ink-2 leading-snug pt-0.5">
+              Scroll down and tap <strong className="text-ink font-semibold">Add to Home Screen</strong>
             </p>
-          </div>
-        </>
-      )}
+          </li>
+          <li className="flex items-start gap-3">
+            <span className="w-6 h-6 rounded-full bg-brand text-white text-xs font-semibold flex items-center justify-center shrink-0 mt-0.5">3</span>
+            <p className="text-sm text-ink-2 leading-snug pt-0.5">
+              Tap <strong className="text-ink font-semibold">Add</strong> to confirm
+            </p>
+          </li>
+        </ol>
+        <p className="px-1 text-xs text-muted">Open this page in Safari if you don't see the Share button.</p>
+      </BottomSheet>
     </div>
   )
 }

@@ -2,7 +2,7 @@ const FRETS = 4
 
 // Vertical chord chart: nut at top, strings as columns, frets as rows.
 // Reads a chords-db position { frets, fingers, barres, baseFret }.
-export default function ChordDiagram({ position, strings = 6, accentSet, dark = true }) {
+export default function ChordDiagram({ position, strings = 6, accentSet, dark = true, small = false }) {
   const sGap = 22
   const fGap = 26
   const padX = 20
@@ -32,12 +32,12 @@ export default function ChordDiagram({ position, strings = 6, accentSet, dark = 
   const rootFill = '#2aab9e'
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ maxWidth: strings > 4 ? 200 : 150 }}
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ maxWidth: small ? (strings > 4 ? 110 : 84) : (strings > 4 ? 240 : 180), display: 'block' }}
       role="img" aria-label="Chord diagram">
       {/* Position label for higher (non-open) voicings */}
       {!showNut && (
         <text x={x0 - 8} y={dotY(1) + 4} textAnchor="end" fontSize="11" fill={markCol}
-          fontFamily="'JetBrains Mono', monospace">{baseFret}fr</text>
+          fontFamily="'Geist Mono', monospace">{baseFret}fr</text>
       )}
 
       {/* Fret rows */}
@@ -63,7 +63,7 @@ export default function ChordDiagram({ position, strings = 6, accentSet, dark = 
             <rect x={sx(a) - 8} y={dotY(bf) - 8} width={(b - a) * sGap + 16} height="16" rx="8" fill={dotFill} />
             {fg > 0 && (
               <text x={sx(a)} y={dotY(bf) + 0.5} textAnchor="middle" dominantBaseline="middle"
-                fontSize="10" fontWeight="700" fill={dotText} fontFamily="'JetBrains Mono', monospace">{fg}</text>
+                fontSize="10" fontWeight="700" fill={dotText} fontFamily="'Geist Mono', monospace">{fg}</text>
             )}
           </g>
         )
@@ -73,11 +73,11 @@ export default function ChordDiagram({ position, strings = 6, accentSet, dark = 
       {position.frets.map((f, i) => {
         if (f === -1) {
           return <text key={`m${i}`} x={sx(i)} y={markY} textAnchor="middle" fontSize="11" fill={markCol}
-            fontFamily="'JetBrains Mono', monospace">✕</text>
+            fontFamily="'Geist Mono', monospace">✕</text>
         }
         if (f === 0) {
           return <text key={`m${i}`} x={sx(i)} y={markY} textAnchor="middle" fontSize="12" fill={markCol}
-            fontFamily="'JetBrains Mono', monospace">○</text>
+            fontFamily="'Geist Mono', monospace">○</text>
         }
         if (barres.includes(f)) return null // covered by the barre bar
         const isRoot = accentSet?.has(i)
@@ -88,7 +88,7 @@ export default function ChordDiagram({ position, strings = 6, accentSet, dark = 
             {finger > 0 && (
               <text x={sx(i)} y={dotY(f) + 0.5} textAnchor="middle" dominantBaseline="middle"
                 fontSize="10" fontWeight="700" fill={isRoot ? '#ffffff' : dotText}
-                fontFamily="'JetBrains Mono', monospace">{finger}</text>
+                fontFamily="'Geist Mono', monospace">{finger}</text>
             )}
           </g>
         )

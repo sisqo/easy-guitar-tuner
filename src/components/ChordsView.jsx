@@ -5,13 +5,18 @@ import {
   chordName, suffixLabel, rootPitchClass, rootStringSet,
 } from '../data/chords'
 import ChordDiagram from './ChordDiagram'
+import { Chip, Segmented } from './BottomSheet'
+
+// The three qualities that cover most songs get a chip each; the rest of the
+// database stays one tap further, in the "More" select.
+const QUICK_SUFFIXES = [['major', 'Major'], ['minor', 'Minor'], ['7', '7']]
 
 function ChordsSkeleton() {
   return (
     <div className="flex flex-col gap-4 animate-pulse">
-      <div className="h-9 rounded-lg bg-zinc-200 dark:bg-zinc-800" />
-      <div className="h-10 rounded-lg bg-zinc-200 dark:bg-zinc-800" />
-      <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 h-72 bg-zinc-100 dark:bg-zinc-900/60" />
+      <div className="h-[42px] rounded-xl bg-surface border border-line" />
+      <div className="h-[86px] rounded-xl bg-surface border border-line" />
+      <div className="h-80 rounded-[28px] bg-surface border border-line" />
     </div>
   )
 }
@@ -93,139 +98,134 @@ export default function ChordsView({
 
   if (loading) return <ChordsSkeleton />
 
+  const moreSuffixes = suffixes.filter((x) => !QUICK_SUFFIXES.some(([q]) => q === x))
+  const isMore = !QUICK_SUFFIXES.some(([q]) => q === safeSuffix)
+  const pagerBtn = 'w-8 h-8 rounded-full flex items-center justify-center text-muted disabled:opacity-30 enabled:hover:text-ink enabled:hover:bg-well transition-colors cursor-pointer disabled:cursor-default'
+
   return (
-    <div className="flex flex-col gap-4">
-      {/* Browse | Pinned toggle */}
-      <div className="flex p-1 gap-1 rounded-lg bg-zinc-100 dark:bg-zinc-800/60">
-        {[['browse', 'Browse'], ['pinned', `Pinned (${familyPins.length})`]].map(([v, label]) => (
-          <button key={v} onClick={() => setSubView(v)}
-            className={`flex-1 h-9 rounded-md text-sm font-semibold transition-colors ${
-              subView === v
-                ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-zinc-100'
-                : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
-            }`}>
-            {label}
-          </button>
-        ))}
-      </div>
+    <div className="flex-1 flex flex-col gap-3.5">
+      <Segmented
+        options={[['browse', 'Browse'], ['pinned', `Pinned (${familyPins.length})`]]}
+        value={subView}
+        onChange={setSubView}
+        well="bg-surface"
+      />
 
       {subView === 'pinned' ? (
         /* ---- Pinned grid ---- */
         familyPins.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800 px-6 py-12 flex flex-col items-center gap-3 text-center">
-            <span className="text-[#2aab9e]"><StarIcon filled={false} /></span>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">
-              No pinned chords yet.<br />Tap the <span className="text-[#2aab9e] font-semibold">★</span> on a chord in Browse to add it.
+          <div className="flex-1 rounded-[28px] border border-dashed border-line px-6 py-12 flex flex-col items-center justify-center gap-3 text-center">
+            <span className="text-brand"><StarIcon filled={false} /></span>
+            <p className="text-sm leading-relaxed text-ink-2">
+              No pinned chords yet.<br />Tap the star on a chord in Browse to add it.
             </p>
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
-                {familyPins.length} pinned
-              </span>
-              <button onClick={clearPins} className="text-xs font-medium text-zinc-400 hover:text-red-500 dark:text-zinc-500 dark:hover:text-red-400 transition-colors">
+          <>
+            <div className="flex items-center justify-between px-0.5">
+              <span className="text-[13px] font-medium text-muted">{familyPins.length} pinned</span>
+              <button onClick={clearPins} className="text-[13px] font-medium text-muted hover:text-red-400 transition-colors cursor-pointer">
                 Clear all
               </button>
             </div>
-            <div className="grid grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-3 gap-2">
               {familyPins.map((item, idx) => {
                 const pos = getPosition(db, item.root, item.suffix, item.pos)
                 if (!pos) return null
                 const accent = rootStringSet(pos, rootPitchClass(item.root))
                 return (
                   <div key={`${item.root}|${item.suffix}|${item.pos}|${idx}`}
-                    className="relative rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-1.5 pt-2 pb-1.5 flex flex-col items-center gap-1">
+                    className="relative rounded-2xl bg-surface border border-line px-1.5 pt-3 pb-2 flex flex-col items-center gap-1.5">
                     <button onClick={() => removePin(item)} aria-label="Remove pin"
-                      className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
-                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                      className="absolute top-1.5 right-1.5 w-[22px] h-[22px] rounded-full flex items-center justify-center text-muted hover:text-red-400 transition-colors cursor-pointer">
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>
-                    <div className="text-sm font-bold text-zinc-900 dark:text-zinc-100 leading-none">{chordName(item.root, item.suffix)}</div>
+                    <div className="text-[15px] font-semibold leading-none">{chordName(item.root, item.suffix)}</div>
                     <button onClick={() => playChord(pos.midi, diapason)} aria-label={`Strum ${chordName(item.root, item.suffix)}`}
-                      className="w-full active:scale-95 transition-transform">
-                      <ChordDiagram position={pos} strings={strings} accentSet={accent} dark={dark} />
+                      className="w-full flex justify-center active:scale-95 transition-transform cursor-pointer">
+                      <ChordDiagram position={pos} strings={strings} accentSet={accent} dark={dark} small />
                     </button>
                   </div>
                 )
               })}
             </div>
-          </div>
+          </>
         )
       ) : (
         /* ---- Browse ---- */
         <>
-          {/* Root note selector */}
-          <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1" aria-label="Root note">
-            {roots.map((r) => {
-              const active = r === safeRoot
-              return (
-                <button key={r} onClick={() => onRootChange(r)}
-                  className={`shrink-0 min-w-[42px] h-9 px-2 rounded-lg text-sm font-semibold transition-colors ${
-                    active
-                      ? 'bg-[#2aab9e] text-white'
-                      : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700'
-                  }`}>
-                  {r}
-                </button>
-              )
-            })}
+          <div className="grid grid-cols-6 gap-1.5" role="group" aria-label="Root note">
+            {roots.map((r) => (
+              <Chip key={r} selected={r === safeRoot} onClick={() => onRootChange(r)}
+                className="h-10 rounded-xl text-sm !font-semibold">
+                {r}
+              </Chip>
+            ))}
           </div>
 
-          {/* Quality dropdown */}
-          <div className="relative">
-            <select value={safeSuffix} onChange={(e) => onSuffixChange(e.target.value)} aria-label="Chord quality"
-              className="appearance-none w-full h-10 bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-100 rounded-lg pl-3 pr-9 border border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500 cursor-pointer text-sm font-medium transition-colors">
-              {suffixes.map((s) => <option key={s} value={s}>{suffixLabel(s)}</option>)}
-            </select>
-            <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400"
-              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
-            </svg>
+          <div className="grid grid-cols-4 gap-1.5" role="group" aria-label="Chord quality">
+            {QUICK_SUFFIXES.filter(([q]) => suffixes.includes(q)).map(([q, label]) => (
+              <Chip key={q} selected={q === safeSuffix} onClick={() => onSuffixChange(q)}
+                className="h-[38px] rounded-xl text-[13px]">
+                {label}
+              </Chip>
+            ))}
+            {/* Everything else chords-db knows, in a select dressed as a chip */}
+            <div className="relative">
+              <select value={isMore ? safeSuffix : ''} onChange={(e) => onSuffixChange(e.target.value)} aria-label="More chord qualities"
+                className={`appearance-none w-full h-[38px] rounded-xl pl-3 pr-7 text-[13px] font-medium border truncate cursor-pointer focus:outline-none transition-colors ${
+                  isMore ? 'border-brand/50 bg-brand/[0.12] text-ink' : 'border-line bg-card text-ink-2'
+                }`}>
+                <option value="" disabled>More</option>
+                {moreSuffixes.map((x) => <option key={x} value={x}>{suffixLabel(x)}</option>)}
+              </select>
+              <svg className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-faint"
+                viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
+              </svg>
+            </div>
           </div>
 
-          {/* Chord card */}
-          <div className="rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-5 py-5 flex flex-col items-center gap-3">
-            <div className="text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 tabular-nums">
-              {chordName(safeRoot, safeSuffix)}
+          <div className="flex-1 rounded-[28px] border px-5 py-6 flex flex-col items-center justify-center gap-4"
+            style={{ background: 'linear-gradient(to bottom, var(--panel-from), var(--bg))', borderColor: 'var(--panel-line)', boxShadow: 'var(--panel-inset)' }}>
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-[56px] font-medium tracking-[-0.04em] leading-none">{chordName(safeRoot, safeSuffix)}</span>
+              <span className="whitespace-nowrap text-[13px] text-muted">{suffixLabel(safeSuffix)} · tap to strum</span>
             </div>
 
             {position ? (
-              <button onClick={strum} aria-label="Strum chord" className="active:scale-[0.98] transition-transform">
+              <button onClick={strum} aria-label="Strum chord" className="w-full flex justify-center active:scale-[0.98] transition-transform cursor-pointer">
                 <ChordDiagram position={position} strings={strings} accentSet={accentSet} dark={dark} />
               </button>
             ) : (
-              <p className="text-sm text-zinc-400 dark:text-zinc-600 py-10">No diagram available</p>
+              <p className="text-sm text-faint py-10">No diagram available</p>
             )}
 
             {/* Voicing pager */}
             {positions.length > 0 && (
-              <div className="flex items-center gap-3 justify-center">
-                <button onClick={() => setPosIndex((i) => Math.max(0, i - 1))} disabled={effPos <= 0}
-                  className="p-1.5 rounded-lg text-zinc-500 disabled:opacity-30 enabled:hover:bg-zinc-100 dark:enabled:hover:bg-zinc-800 transition-colors" aria-label="Previous voicing">
-                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6" /></svg>
+              <div className="flex items-center gap-2 justify-center -my-1">
+                <button onClick={() => setPosIndex((i) => Math.max(0, i - 1))} disabled={effPos <= 0} className={pagerBtn} aria-label="Previous voicing">
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6" /></svg>
                 </button>
-                <span className="text-xs text-zinc-500 dark:text-zinc-400 tabular-nums min-w-[96px] text-center">
+                <span className="font-mono text-xs text-muted tabular-nums min-w-[96px] text-center">
                   {effPos + 1} / {positions.length} · {position.baseFret === 1 ? 'Open' : `${position.baseFret}fr`}
                 </span>
-                <button onClick={() => setPosIndex((i) => Math.min(positions.length - 1, i + 1))} disabled={effPos >= positions.length - 1}
-                  className="p-1.5 rounded-lg text-zinc-500 disabled:opacity-30 enabled:hover:bg-zinc-100 dark:enabled:hover:bg-zinc-800 transition-colors" aria-label="Next voicing">
-                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 18l6-6-6-6" /></svg>
+                <button onClick={() => setPosIndex((i) => Math.min(positions.length - 1, i + 1))} disabled={effPos >= positions.length - 1} className={pagerBtn} aria-label="Next voicing">
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 18l6-6-6-6" /></svg>
                 </button>
               </div>
             )}
 
-            {/* Pin + Strum */}
-            <div className="mt-1 flex items-center gap-3">
-              <button onClick={togglePin} aria-label={isPinned ? 'Unpin chord' : 'Pin chord'}
-                className={`w-10 h-10 rounded-full flex items-center justify-center border transition-colors ${
-                  isPinned
-                    ? 'border-[#2aab9e] text-[#2aab9e] bg-[#2aab9e]/10'
-                    : 'border-zinc-300 text-zinc-400 hover:text-[#2aab9e] hover:border-[#2aab9e] dark:border-zinc-700 dark:text-zinc-500'
+            <div className="flex items-center gap-2.5">
+              <button onClick={togglePin} aria-label={isPinned ? 'Unpin chord' : 'Pin chord'} aria-pressed={isPinned}
+                className={`w-12 h-12 rounded-full flex items-center justify-center border transition-colors cursor-pointer ${
+                  isPinned ? 'border-brand text-brand bg-brand/[0.12]' : 'border-line bg-surface text-muted hover:text-brand'
                 }`}>
                 <StarIcon filled={isPinned} />
               </button>
               <button onClick={strum}
-                className="flex items-center gap-2 px-5 h-10 rounded-full bg-gradient-to-b from-emerald-500 to-teal-500 text-white text-sm font-semibold shadow-sm shadow-emerald-500/20 active:scale-[0.97] transition-transform">
+                className="h-12 px-6 rounded-full bg-emerald-500 text-white text-[15px] font-semibold flex items-center gap-2 active:scale-[0.97] transition-transform cursor-pointer"
+                style={{ boxShadow: '0 0 0 5px rgba(16,185,129,0.12)' }}>
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
                 Strum
               </button>

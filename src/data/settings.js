@@ -10,7 +10,7 @@ export const SETTINGS_DEFAULTS = {
   // Display
   inTuneThreshold:   3,     // green zone half-width, cents
   barRange:          25,    // bar full scale, ± cents
-  displaySmooth:     0.22,  // needle glide only
+  displaySmooth:     0.22,  // bar segment fade only
 
   // Signal chain
   windowSize:        8192,  // analyser fftSize — samples per analysis
