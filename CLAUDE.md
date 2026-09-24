@@ -37,7 +37,7 @@ tunings.js  →  App.jsx  →  usePitchDetector (audio graph + loop)
 
 All detection parameters live in `src/data/settings.js` (plain data, no React — so `scripts/` can import it) and are surfaced by `useSettings` (persisted to localStorage as `egt-settings`). They reach `usePitchDetector` via a `settingsRef` — a `useRef` kept current in a `useEffect` — so the loop reads the latest values every frame without restarting the AudioContext.
 
-`inTune` is latched **once** in `App.jsx`, with `HYSTERESIS_CENTS` of slack, and passed to `TunerBar`, `GuitarHeadstock` and the beep. Do not recompute it per component: they used to each call `isInTune()` on raw cents and visibly disagreed at the zone boundary.
+`inTune` is latched **once** in `App.jsx`, with `HYSTERESIS_CENTS` of slack, and passed to `TunerBar`, `GuitarHeadstock` and the beep. Do not recompute it per component: they used to each call `isInTune()` on raw cents and visibly disagreed at the zone boundary. It cannot *enter* while `settling` (see "Display scale"): a flat string's attack glides down through the zone and used to flash green on the way; an already-green string is not knocked out by a gentle re-pluck.
 
 ### Pitch detection pipeline
 
@@ -136,7 +136,7 @@ The synth accumulates phase per sample. An earlier version wrote `sin(2π·f(t)�
 Stack order in `<main>`:
 1. **Mic button** + `AutoToggle` chip — primary action row (instrument and tuning are `<select>`s inside `HamburgerMenu`, not in the main stack)
 2. **`PresetSelector`** — the detection-preset chip and its popover. On the tuner screen rather than behind Settings because comparing two sets of parameters is only useful if it costs one tap with a guitar in your hands; saving and reverting live in the popover too, since walking to a side panel to keep a setting you just found is how you lose it. Its wrapper carries `z-30` so the popover covers the tuner card. `PresetManager` (rename, delete, and the same save/revert) sits at the top of `SettingsPanel`.
-3. **Tuner panel** — one card: empty state (mic off) or live `TunerBar`, then `DebugOverlay` when enabled, then the tuned-string progress dots, then `GuitarHeadstock`
+3. **Tuner panel** — one card: empty state (mic off) or live `TunerBar`, then `InputLevel` (mic on), then `DebugOverlay` when enabled, then the tuned-string progress dots, then `GuitarHeadstock`
 
 `GuitarHeadstock` is wrapped in `React.memo` — it is the heaviest node in the tree, and it must not re-render on every reading. That is why `handleLockToggle` is a `useCallback`; a fresh identity there would defeat the memo.
 
@@ -180,6 +180,12 @@ Hook captures `beforeinstallprompt` (Android Chrome), detects iOS Safari (`/ipho
 `TunerBar` reads out **real cents, to the cent**, and both the bar and its labels span ±`barRange` (default 25). It used to show `Math.round(cents / 5)` on a fixed ±50 bar, which meant a string three cents out looked perfectly in tune — half of "not as precise as other tuners" was this, not the detector.
 
 The needle is a CSS `left` transition retargeted on each update; `displaySmooth` only sets its duration. All the real smoothing happens in `pitchTracker`, so the number, the colour and the dot describe the same value.
+
+**The letter is the target string**, not the chromatic name of the pitch: the cents are measured against that string (auto or locked), so the two must share a reference. A low E 60¢ flat used to read "D#2" next to "−60". When the sounding note differs, `TunerBar` adds a small "playing D#2" (`soundingNote`).
+
+**Settling**: `usePitchDetector` publishes `settling` — the detector's `fresh` period (~1.5 windows after a pluck) while a note is shown. During it `TunerBar` keeps the needle moving but grey, with `···` instead of an instruction. The window smears the sharp attack over ~250 ms (a synthetic E4 reads +23¢ at 131 ms when the string itself is at +5¢), so without this every pluck said "▼ tune down" first.
+
+**`InputLevel`**: a small RMS meter (dBFS, with a tick at the current noise gate) polling `statsRef` on its own clock like `DebugOverlay`, so it re-renders only itself. After 600 ms of `gate: 'clarity'` with no note it says "sound, but no clear note" — the case that otherwise looks identical to silence.
 
 Color: flat = sky-400 `#38bdf8`, sharp = amber-400 `#fbbf24`, in tune = emerald-500 `#10b981`.
 

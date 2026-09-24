@@ -18,6 +18,7 @@ import PresetSelector from './components/PresetSelector'
 import ChordsView from './components/ChordsView'
 import KofiButton from './components/KofiButton'
 import DebugOverlay from './components/DebugOverlay'
+import InputLevel from './components/InputLevel'
 
 // How long the pitch must stay inside the in-tune zone before the success beep
 // fires. Shorter than it used to be because the zone itself is now ±3 cents:
@@ -119,7 +120,7 @@ export default function App() {
   const stringsRef = useRef(strings)
   useEffect(() => { stringsRef.current = strings }, [strings])
 
-  const { isListening, pitch, error, start, stop, statsRef } = usePitchDetector(settingsRef, stringsRef)
+  const { isListening, pitch, settling, error, start, stop, statsRef } = usePitchDetector(settingsRef, stringsRef)
   const { playNote, playChord } = useOscillator()
   const { beep } = useSuccessBeep()
 
@@ -159,23 +160,27 @@ export default function App() {
     }
   }
 
-  const { displayNote, displayCents, activeStringId, activeFreq } = useMemo(() => {
-    if (lockedStringId !== null) {
-      const locked = strings.find(s => s.id === lockedStringId)
-      const cents = locked && pitch ? getCents(pitch, locked.freq) : null
-      return {
-        displayNote: pitch ? freqToNoteName(pitch, settings.diapason) : null,
-        displayCents: cents ?? 0,
-        activeStringId: lockedStringId,
-        activeFreq: locked?.freq ?? null,
-      }
+  // The big letter names the string being tuned, because that is what the cents
+  // are measured against. It used to be the chromatic name of the pitch, so a low E
+  // sixty cents flat read "D#2" next to "−60" — two labels, two references. When
+  // what is sounding is a different note, it is shown separately as `soundingNote`.
+  const { displayNote, soundingNote, displayCents, activeStringId, activeFreq } = useMemo(() => {
+    const target = lockedStringId !== null
+      ? strings.find(s => s.id === lockedStringId) ?? null
+      : findClosestString(pitch, strings)
+    if (!pitch || !target) {
+      return { displayNote: null, soundingNote: null, displayCents: 0, activeStringId: lockedStringId, activeFreq: target?.freq ?? null }
     }
-    const closest = findClosestString(pitch, strings)
+    const sounding = freqToNoteName(pitch, settings.diapason)
     return {
-      displayNote: closest ? freqToNoteName(pitch, settings.diapason) : null,
-      displayCents: closest?.cents ?? 0,
-      activeStringId: closest?.id ?? null,
-      activeFreq: closest?.freq ?? null,
+      // The ʼ / ˡ marks tell a course's twin pegs apart on the headstock buttons;
+      // on the big letter they are noise. The label itself is kept rather than
+      // rebuilt from note+octave, so the half-step tunings still read "Eb2".
+      displayNote: target.label.replace(/[ʼˡ]/g, ''),
+      soundingNote: sounding !== freqToNoteName(target.freq, settings.diapason) ? sounding : null,
+      displayCents: getCents(pitch, target.freq),
+      activeStringId: target.id,
+      activeFreq: target.freq,
     }
   }, [lockedStringId, pitch, strings, settings.diapason])
 
@@ -188,8 +193,13 @@ export default function App() {
       return
     }
     const off = Math.abs(displayCents)
-    setInTune(prev => (prev ? off <= settings.inTuneThreshold + HYSTERESIS_CENTS : off <= settings.inTuneThreshold))
-  }, [displayNote, displayCents, settings.inTuneThreshold])
+    const exit = off <= settings.inTuneThreshold + HYSTERESIS_CENTS
+    // Right after a pluck the reading glides down from the sharp attack, and a
+    // string that is flat passes through the zone on its way: it must not flash
+    // green (or start the beep's dwell) on the way through. A string already in
+    // tune is not knocked out by a gentle re-pluck either.
+    setInTune(prev => (prev ? exit : !settling && off <= settings.inTuneThreshold))
+  }, [displayNote, displayCents, settling, settings.inTuneThreshold])
 
   // The green band has to be drawn at whatever width the verdict is currently using,
   // hysteresis included. Drawing it at the entry width while the latch holds until
@@ -326,6 +336,8 @@ export default function App() {
               <TunerBar
                 cents={displayCents}
                 note={displayNote}
+                soundingNote={soundingNote}
+                settling={settling}
                 freq={pitch}
                 inTune={inTune}
                 zoneCents={zoneCents}
@@ -333,6 +345,7 @@ export default function App() {
                 barRange={settings.barRange}
               />
             )}
+            {isListening && <InputLevel statsRef={statsRef} hasNote={displayNote !== null} />}
             {settings.debugOverlay && isListening && <DebugOverlay statsRef={statsRef} />}
           </div>
 

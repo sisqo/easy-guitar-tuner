@@ -1,4 +1,4 @@
-export default function TunerBar({ cents, note, freq, inTune = false, zoneCents = 3, displaySmooth = 0.22, barRange = 25 }) {
+export default function TunerBar({ cents, note, soundingNote = null, freq, settling = false, inTune = false, zoneCents = 3, displaySmooth = 0.22, barRange = 25 }) {
   // Needle smoothing is purely visual: a CSS `left` transition retargeted on every
   // update. Duration maps the displaySmooth EMA alpha to its per-frame time
   // constant, so the number, color, arrows and needle all derive from the same
@@ -11,22 +11,26 @@ export default function TunerBar({ cents, note, freq, inTune = false, zoneCents 
 
   const clampedCents = Math.max(-barRange, Math.min(barRange, displayCents))
   const pct = ((clampedCents + barRange) / (barRange * 2)) * 100
-  const isSharp = hasSignal && !inTune && displayCents > 0
-  const isFlat  = hasSignal && !inTune && displayCents < 0
+  // While a pluck is settling the reading is still on its way down from the
+  // attack: the needle keeps moving, but in neutral grey and without an
+  // instruction, so a string that is in fact flat is not called sharp first.
+  const provisional = hasSignal && settling && !inTune
+  const isSharp = hasSignal && !provisional && !inTune && displayCents > 0
+  const isFlat  = hasSignal && !provisional && !inTune && displayCents < 0
 
   // Real cents, to the cent. The old ±10 scale rounded to 5-cent steps, so a
   // string three cents out looked perfectly in tune.
   const displayCentsInt = Math.round(displayCents)
   const ticks = [-barRange, -Math.round(barRange / 2), 0, Math.round(barRange / 2), barRange]
 
-  const sig = !hasSignal ? 'zinc' : inTune ? 'emerald' : isSharp ? 'amber' : 'sky'
+  const sig = !hasSignal || provisional ? 'zinc' : inTune ? 'emerald' : isSharp ? 'amber' : 'sky'
   const indicatorBg = { zinc: '#a1a1aa', emerald: '#10b981', amber: '#fbbf24', sky: '#38bdf8' }[sig]
   const indicatorGlow = {
     zinc: 'none', emerald: '0 0 12px rgba(16,185,129,0.65)',
     amber: '0 0 11px rgba(251,191,36,0.6)', sky: '0 0 11px rgba(56,189,248,0.6)',
   }[sig]
 
-  const unitColor = !hasSignal ? 'text-zinc-400 dark:text-zinc-600'
+  const unitColor = !hasSignal || provisional ? 'text-zinc-400 dark:text-zinc-600'
     : inTune  ? 'text-emerald-500 dark:text-emerald-400'
     : isSharp ? 'text-amber-500 dark:text-amber-400'
     : 'text-sky-500 dark:text-sky-400'
@@ -45,8 +49,15 @@ export default function TunerBar({ cents, note, freq, inTune = false, zoneCents 
               <span className="text-[11px] font-normal ml-0.5">¢</span>
             </span>
             {freq ? (
-              <span className="text-[10px] text-zinc-400 dark:text-zinc-600 tabular-nums mt-1">
+              <span className="text-[10px] text-zinc-400 dark:text-zinc-600 tabular-nums mt-1 whitespace-nowrap">
                 {freq.toFixed(1)} Hz
+              </span>
+            ) : null}
+            {/* The letter is the string being tuned; when what is sounding is
+                another note (a string far off, or the wrong one), say so. */}
+            {soundingNote ? (
+              <span className="text-[10px] text-zinc-500 dark:text-zinc-400 tabular-nums mt-0.5 whitespace-nowrap">
+                playing {soundingNote}
               </span>
             ) : null}
           </div>
@@ -101,7 +112,7 @@ export default function TunerBar({ cents, note, freq, inTune = false, zoneCents 
           {/* With the mic on and nothing playing there is nothing to tune down: the
               old ternary fell through to "tune down" and pointed the user at a
               string that was never measured. */}
-          {!hasSignal ? 'listening…' : inTune ? '✓ IN TUNE' : isFlat ? '▲ tune up' : '▼ tune down'}
+          {!hasSignal ? 'listening…' : provisional ? '···' : inTune ? '✓ IN TUNE' : isFlat ? '▲ tune up' : '▼ tune down'}
         </span>
         <span className={isSharp ? 'text-amber-500 font-medium' : ''}>+{barRange}</span>
       </div>

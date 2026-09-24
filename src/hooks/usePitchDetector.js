@@ -25,6 +25,11 @@ function windowSizeOf(settings) {
 export function usePitchDetector(settingsRef, stringsRef) {
   const [isListening, setIsListening] = useState(false)
   const [pitch, setPitch] = useState(null)
+  // True for the fresh period after a pluck, while a note is shown. The reading
+  // is still gliding down from the sharp attack then — and the window smears that
+  // glide over ~250 ms, twice as long as it really lasts — so the display treats
+  // it as provisional rather than telling the user to tune down on every pluck.
+  const [settling, setSettling] = useState(false)
   const [error, setError] = useState(null)
 
   const audioCtxRef = useRef(null)
@@ -64,6 +69,7 @@ export function usePitchDetector(settingsRef, stringsRef) {
     statsRef.current = { ...statsRef.current, gate: 'idle', smoothedHz: null, rawHz: 0, clarity: 0, rms: 0, fresh: false, candidates: 0 }
     setIsListening(false)
     setPitch(null)
+    setSettling(false)
   }, [])
 
   const start = useCallback(async () => {
@@ -121,6 +127,7 @@ export function usePitchDetector(settingsRef, stringsRef) {
 
       let lastAnalysisAt = 0
       let published = null
+      let publishedSettling = false
       let analyses = 0
       let accepted = 0
       let counterAt = performance.now()
@@ -179,6 +186,11 @@ export function usePitchDetector(settingsRef, stringsRef) {
           published = hz
           setPitch(hz)
         }
+        const isSettling = fresh && hz !== null
+        if (isSettling !== publishedSettling) {
+          publishedSettling = isSettling
+          setSettling(isSettling)
+        }
 
         analyses++
         if (gate === 'ok') accepted++
@@ -215,5 +227,5 @@ export function usePitchDetector(settingsRef, stringsRef) {
 
   useEffect(() => () => stop(), [stop])
 
-  return { isListening, pitch, error, start, stop, statsRef }
+  return { isListening, pitch, settling, error, start, stop, statsRef }
 }
