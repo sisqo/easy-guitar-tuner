@@ -16,7 +16,7 @@ npm run preview    # serve the production build locally
 
 **GitHub remote**: the repo lives at `github.com/sisqo/easy-guitar-tuner` (account: `sisqo`, not `flimberti`). Switch CLI auth with `gh auth switch --user sisqo` before pushing.
 
-**Deployment**: Vercel auto-deploys from `main`. Production: `https://easy-guitar-tuner-eight.vercel.app`.
+**Deployment**: Vercel auto-deploys from `main` (project `easy-guitar-tuner`, team `sisqoz`). The old production alias `https://easy-guitar-tuner-eight.vercel.app` returns `DEPLOYMENT_NOT_FOUND` as of 2026-09-24, and the current public domain is not recorded here yet — fill it in once known. Per-deployment URLs (`easy-guitar-tuner-<id>-sisqoz.vercel.app`) sit behind Vercel login. `easy-guitar-tuner.vercel.app` is someone else's site. To confirm a push deployed: `gh api repos/sisqo/easy-guitar-tuner/commits/<sha>/status` (the `Vercel` context).
 
 ## Architecture
 
