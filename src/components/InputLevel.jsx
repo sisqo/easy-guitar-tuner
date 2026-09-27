@@ -24,11 +24,18 @@ function toPct(rms) {
   return Math.max(0, Math.min(100, ((db - DB_MIN) / (DB_MAX - DB_MIN)) * 100))
 }
 
-export default function InputLevel({ statsRef, hasNote }) {
+// Always mounted, so its row is reserved with the mic off too: appearing on
+// start used to push the headstock down. `active` false keeps it idle and hidden.
+export default function InputLevel({ statsRef, hasNote, active = true }) {
   const [s, setS] = useState({ rms: 0, gateLevel: 0, unclear: false })
   const unclearSince = useRef(null)
 
   useEffect(() => {
+    if (!active) {
+      unclearSince.current = null
+      setS({ rms: 0, gateLevel: 0, unclear: false })
+      return
+    }
     const id = setInterval(() => {
       const { rms, gateLevel, gate } = statsRef.current
       const now = performance.now()
@@ -38,14 +45,14 @@ export default function InputLevel({ statsRef, hasNote }) {
       setS({ rms, gateLevel, unclear })
     }, POLL_MS)
     return () => clearInterval(id)
-  }, [statsRef])
+  }, [statsRef, active])
 
   const level = toPct(s.rms)
   const gate = toPct(s.gateLevel)
   const heard = s.rms >= s.gateLevel && s.rms > 0
 
   return (
-    <div className="mt-2 flex flex-col items-center gap-1" aria-hidden="true">
+    <div className={`mt-2 flex flex-col items-center gap-1 ${active ? '' : 'invisible'}`} aria-hidden="true">
       <div className="relative h-1 w-20 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
         <div
           className={`absolute inset-y-0 left-0 rounded-full transition-[width] duration-75 ${heard ? 'bg-teal-500/80' : 'bg-zinc-400/60 dark:bg-zinc-600'}`}

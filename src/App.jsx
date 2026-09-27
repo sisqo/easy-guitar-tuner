@@ -496,7 +496,7 @@ export default function App() {
                   flashLabel={tunedFlash?.label ?? null}
                   idleHint={chromatic ? 'Play any note.' : undefined}
                 />
-                {isListening && <InputLevel statsRef={statsRef} hasNote={displayNote !== null} />}
+                <InputLevel statsRef={statsRef} hasNote={displayNote !== null} active={isListening} />
                 {settings.debugOverlay && isListening && <DebugOverlay statsRef={statsRef} />}
               </div>
 
