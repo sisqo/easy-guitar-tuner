@@ -66,20 +66,21 @@ export default function PresetSelector({
 
   return (
     <>
+      {/* A pill in the mic row. "Modified" is a dot here — the word would not fit
+          beside the mic and Auto on a phone; the sheet spells it out. */}
       <button
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
         aria-label={`Detection preset: ${active.label}${dirty ? ', modified' : ''}`}
-        className="w-full h-10 px-3 rounded-xl flex items-center gap-2 border border-line bg-surface text-ink hover:border-grabber transition-colors cursor-pointer"
+        className="h-10 px-3 min-w-0 rounded-full flex items-center gap-2 border border-line bg-surface text-ink-2 hover:text-ink hover:border-grabber transition-colors cursor-pointer active:scale-[0.97]"
       >
-        <svg className="w-[15px] h-[15px] shrink-0 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+        <svg className="w-3.5 h-3.5 shrink-0 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" />
           <circle cx="16" cy="6" r="2" /><circle cx="10" cy="12" r="2" /><circle cx="18" cy="18" r="2" />
         </svg>
-        <span className="text-xs text-muted whitespace-nowrap">Preset</span>
-        <span className="text-[13px] font-medium truncate">{active.label}</span>
-        {dirty && <Modified />}
-        <svg className="w-3.5 h-3.5 ml-auto shrink-0 text-faint" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+        <span className="text-[13px] font-medium truncate max-w-[9rem]">{active.label}</span>
+        {dirty && <span className="w-1.5 h-1.5 -ml-1 rounded-full bg-amber-500 shrink-0" title="Modified" />}
+        <svg className="w-3 h-3 shrink-0 text-faint" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
         </svg>
       </button>

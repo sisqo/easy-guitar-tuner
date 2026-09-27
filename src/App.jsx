@@ -316,8 +316,9 @@ export default function App() {
             />
           </main>
         ) : (
-          <main className="relative flex-1 flex flex-col gap-3.5 px-4 pt-3.5">
-            {/* Primary controls — mic + auto */}
+          <main className="relative flex flex-col gap-3.5 px-4 pt-3.5">
+            {/* One control row: mic, auto/lock, and the detection preset — one tap
+                to compare two configurations mid-session */}
             <div className="flex items-center justify-center gap-3 min-h-[60px]">
               <MicButton listening={isListening} onStart={start} onStop={handleStop} />
               <AutoToggle
@@ -326,19 +327,18 @@ export default function App() {
                 strings={strings}
                 onToggle={handleLockToggle}
               />
+              <PresetSelector
+                presets={preset.presets}
+                activeId={preset.activeId}
+                active={preset.active}
+                dirty={preset.dirty}
+                suggestedName={preset.suggestedName}
+                onSelect={preset.selectPreset}
+                onSave={preset.saveActive}
+                onSaveAs={preset.saveAs}
+                onRevert={preset.revert}
+              />
             </div>
-            {/* Detection preset — one tap to compare two configurations mid-session */}
-            <PresetSelector
-              presets={preset.presets}
-              activeId={preset.activeId}
-              active={preset.active}
-              dirty={preset.dirty}
-              suggestedName={preset.suggestedName}
-              onSelect={preset.selectPreset}
-              onSave={preset.saveActive}
-              onSaveAs={preset.saveAs}
-              onRevert={preset.revert}
-            />
             {error && (
               <p className="-mt-1 text-center text-xs text-red-500 dark:text-red-400 leading-snug">
                 {error === 'Microphone access denied.'
@@ -347,11 +347,11 @@ export default function App() {
               </p>
             )}
 
-            {/* One tuner panel: readout on top, headstock below, open at the bottom */}
+            {/* One tuner card: readout on top, headstock below */}
             <div
-              className="relative flex-1 flex flex-col overflow-hidden rounded-t-[28px] border border-b-0"
+              className="relative flex flex-col overflow-hidden rounded-[28px] border"
               style={{
-                background: 'linear-gradient(to bottom, var(--panel-from), var(--bg) 75%)',
+                background: 'linear-gradient(to bottom, var(--panel-from), var(--bg))',
                 borderColor: 'var(--panel-line)',
                 boxShadow: 'var(--panel-inset)',
               }}
@@ -361,7 +361,7 @@ export default function App() {
                 className="pointer-events-none absolute inset-0 transition-opacity duration-300"
                 style={{ background: 'radial-gradient(90% 40% at 50% 0%, rgba(16,185,129,0.14), transparent 70%)', opacity: inTune ? 1 : 0 }}
               />
-              <div className="relative px-[22px] pt-[18px] pb-1.5 flex flex-col gap-3">
+              <div className="relative px-5 pt-4 pb-1 flex flex-col gap-2.5">
                 <div className="flex items-center justify-between gap-3 h-6">
                   <span className="flex items-center gap-2 min-w-0 text-sm font-medium text-ink-2 whitespace-nowrap">
                     <span className="w-2 h-2 shrink-0 rounded-full" style={{ background: isListening ? '#10b981' : 'var(--note-idle)' }} />
@@ -409,7 +409,7 @@ export default function App() {
                 {settings.debugOverlay && isListening && <DebugOverlay statsRef={statsRef} />}
               </div>
 
-              <div className="relative flex-1 flex items-center justify-center px-2 pt-1 pb-5">
+              <div className="relative flex justify-center px-2 pt-2 pb-1">
                 <GuitarHeadstock
                   strings={strings}
                   activeStringId={activeStringId}

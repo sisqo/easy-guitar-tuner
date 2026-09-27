@@ -85,12 +85,12 @@ The three signal colours carry the whole tuning conversation and stay identical 
 - **Geist** for everything readable as UI: the note letter, labels, buttons, the wordmark.
 - **Geist Mono** for data: cents, Hz, the octave digit next to the note, the bar's scale, the header subtitle (`Standard · EADGBE`), the build hash, chord-diagram marks.
 - The note letter (84px, 500, −0.04em) is always the largest thing on screen; its octave sits beside it in 20px mono, muted.
-- No uppercase-tracked labels any more, except the small amber `MODIFIED` badge on a preset.
+- No uppercase-tracked labels any more, except the small amber `MODIFIED` badge in the preset sheet. On the chip in the control row "modified" is an amber dot — the word does not fit beside the mic and Auto on a phone.
 
 ## 4. Components
 
 ### Tuner panel
-One card, 28px top corners, open at the bottom so the headstock's strings fade into the page. From the top:
+One closed card, 28px corners, sized to its content rather than stretched to the viewport — stretching it left a band of empty wood-less panel under the headstock. It sits under a single control row: mic, the Auto/lock chip and the preset chip (pills, 40px tall). From the top:
 
 1. **Status row** — dot + `Mic off` / `Listening · Auto` / `Listening · E2`; on the right, one dot per string (emerald once tuned), `n/N` and a small reset button, shown only once something is tuned.
 2. **Reading** — note letter left; cents (signal-coloured, mono) and Hz right, plus "playing D#2" when the sounding note is not the target. With the mic off: a muted "–" and a "↑ Tap the mic" pill with a one-line hint.

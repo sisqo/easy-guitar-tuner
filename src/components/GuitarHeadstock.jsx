@@ -1,12 +1,13 @@
 import { memo } from 'react'
 
-// Geometry per string count. The view is cropped CROP units below the nut: the
-// strings fade into the panel instead of running to the bottom of a tall SVG.
+// Geometry per string count. The view is cropped CROP units below the nut — just
+// enough for the strings to fade into the panel — and just above the topmost
+// button, so the headstock adds no empty band to the card.
 //   hs            headstock rect [x, y, w, h, rx]
 //   leftIndices / rightIndices   string indices per side, top-to-bottom
 //   leftPegs / rightPegs         peg centres, same order
 //   leftBtnX / rightBtnX         button column x; buttons sit level with their peg
-const CROP = 97
+const CROP = 44
 const RAW = {
   4: {  // ukulele
     hs: [110, 28, 80, 160, 12],
@@ -52,7 +53,8 @@ function build(R) {
     const m = (nutY + py) / 2
     return `M ${sx} ${H} L ${sx} ${nutY} C ${sx} ${m} ${px} ${m} ${px} ${py}`
   }
-  return { ...R, hs: { x, y, w, h, rx }, nutY, H, peg, btn, path }
+  const top = Math.min(y, ...btn.map(b => b[1] - R.buttonR)) - 4
+  return { ...R, hs: { x, y, w, h, rx }, nutY, H, top, VH: H - top, peg, btn, path }
 }
 
 const LAYOUTS = { 4: build(RAW[4]), 6: build(RAW[6]), 12: build(RAW[12]) }
@@ -84,7 +86,7 @@ function GuitarHeadstock({
 
   return (
     <div className="relative w-full max-w-[340px] mx-auto">
-      <svg viewBox={`0 0 300 ${H}`} className="block w-full" aria-label="Guitar headstock tuner">
+      <svg viewBox={`0 ${L.top} 300 ${L.VH}`} className="block w-full" aria-label="Guitar headstock tuner">
         <defs>
           <linearGradient id="hs-wood" x1="0" y1="0" x2="1" y2="0">
             <stop offset="0" style={{ stopColor: 'var(--wood-0)' }} />
@@ -129,7 +131,7 @@ function GuitarHeadstock({
               }} />
           )
         })}
-        <rect x="0" y={H - 90} width="300" height="90" fill="url(#hs-fade)" pointerEvents="none" />
+        <rect x="0" y={H - 40} width="300" height="40" fill="url(#hs-fade)" pointerEvents="none" />
 
         {L.peg.map(([x, y], i) => (
           <circle key={`peg-${i}`} cx={x} cy={y} r={L.pegR * 0.8} fill="url(#hs-peg)" />
@@ -172,7 +174,7 @@ function GuitarHeadstock({
         return (
           <span key={`lbl-${s.id}`} aria-hidden="true"
             className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none select-none font-medium tabular-nums whitespace-nowrap"
-            style={{ left: `${(x / 300) * 100}%`, top: `${((marked ? y - 2 : y) / H) * 100}%`, fontSize: L.labelSize, color }}>
+            style={{ left: `${(x / 300) * 100}%`, top: `${((marked ? y - 2 : y) - L.top) / L.VH * 100}%`, fontSize: L.labelSize, color }}>
             {s.label}
           </span>
         )
@@ -183,7 +185,7 @@ function GuitarHeadstock({
         <span key={flash.key} className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none aspect-square"
           style={{
             left: `${(L.btn[flashIdx][0] / 300) * 100}%`,
-            top: `${(L.btn[flashIdx][1] / H) * 100}%`,
+            top: `${(L.btn[flashIdx][1] - L.top) / L.VH * 100}%`,
             width: `${((L.buttonR * 2) / 300) * 100}%`,
           }}>
           <span className="egt-pulse absolute inset-0 rounded-full border-2 border-emerald-500" />
