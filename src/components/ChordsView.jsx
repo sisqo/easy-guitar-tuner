@@ -31,7 +31,7 @@ function StarIcon({ filled }) {
 }
 
 export default function ChordsView({
-  instrument, diapason, dark, playChord, root, suffix, onRootChange, onSuffixChange,
+  instrument, diapason, dark, playChord, root, suffix, onRootChange, onSuffixChange, lefty = false,
 }) {
   const family = chordFamily(instrument)
   const [db, setDb] = useState(null)
@@ -143,7 +143,7 @@ export default function ChordsView({
                     <div className="text-[15px] font-semibold leading-none">{chordName(item.root, item.suffix)}</div>
                     <button onClick={() => playChord(pos.midi, diapason)} aria-label={`Strum ${chordName(item.root, item.suffix)}`}
                       className="w-full flex justify-center active:scale-95 transition-transform cursor-pointer">
-                      <ChordDiagram position={pos} strings={strings} accentSet={accent} dark={dark} small />
+                      <ChordDiagram position={pos} strings={strings} accentSet={accent} dark={dark} small mirrored={lefty} />
                     </button>
                   </div>
                 )
@@ -195,7 +195,7 @@ export default function ChordsView({
 
             {position ? (
               <button onClick={strum} aria-label="Strum chord" className="w-full flex justify-center active:scale-[0.98] transition-transform cursor-pointer">
-                <ChordDiagram position={position} strings={strings} accentSet={accentSet} dark={dark} />
+                <ChordDiagram position={position} strings={strings} accentSet={accentSet} dark={dark} mirrored={lefty} />
               </button>
             ) : (
               <p className="text-sm text-faint py-10">No diagram available</p>

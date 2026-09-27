@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, useRef } from 'react'
 
 // Geometry per string count. The view is cropped CROP units below the nut — just
 // enough for the strings to fade into the panel — and just above the topmost
@@ -57,7 +57,29 @@ function build(R) {
   return { ...R, hs: { x, y, w, h, rx }, nutY, H, top, VH: H - top, peg, btn, path }
 }
 
+// A left-handed headstock is the mirror image: bass strings on the right. The
+// sides swap wholesale, so the peg arrow's rule (strings leave each post on its
+// inner side) still holds and its direction mirrors with it.
+function mirror(R) {
+  const fx = (x) => 300 - x
+  const [x, y, w, h, rx] = R.hs
+  return {
+    ...R,
+    hs: [300 - x - w, y, w, h, rx],
+    nutXs: R.nutXs.map(fx),
+    leftPegs: R.rightPegs.map(([px, py]) => [fx(px), py]),
+    rightPegs: R.leftPegs.map(([px, py]) => [fx(px), py]),
+    leftIndices: R.rightIndices, rightIndices: R.leftIndices,
+    leftBtnX: fx(R.rightBtnX), rightBtnX: fx(R.leftBtnX),
+  }
+}
+
 const LAYOUTS = { 4: build(RAW[4]), 6: build(RAW[6]), 12: build(RAW[12]) }
+const MIRRORED = { 4: build(mirror(RAW[4])), 6: build(mirror(RAW[6])), 12: build(mirror(RAW[12])) }
+
+// Press longer than this and the button holds a sustained reference tone
+// instead of acting as a tap
+const HOLD_MS = 350
 
 const SIG = { emerald: '#10b981', amber: '#fbbf24', sky: '#38bdf8', zinc: '#a1a1aa' }
 const LOCK = '#38bdf8'
@@ -97,8 +119,35 @@ function isSameFreq(a, b) {
 function GuitarHeadstock({
   strings, activeStringId, activeFreq, lockedStringId, inTune = false, signal = null, listening = false,
   onStringSelect, onPlay, tunedStrings, flash = null, turn = null,
+  mirrored = false, onHoldStart, onHoldEnd,
 }) {
-  const L = LAYOUTS[strings.length] ?? LAYOUTS[6]
+  const layouts = mirrored ? MIRRORED : LAYOUTS
+  const L = layouts[strings.length] ?? layouts[6]
+
+  // Tap: lock + one plucked reference. Hold: a sustained reference until release,
+  // for tuning by ear; the lock is left alone.
+  const press = useRef(null)
+  function down(e, s) {
+    e.preventDefault()
+    const p = { id: s.id, held: false }
+    p.timer = setTimeout(() => { p.held = true; onHoldStart?.(s.freq) }, HOLD_MS)
+    press.current = p
+  }
+  function up(s) {
+    const p = press.current
+    if (!p || p.id !== s.id) return
+    press.current = null
+    clearTimeout(p.timer)
+    if (p.held) onHoldEnd?.()
+    else { onPlay(s.freq); onStringSelect(s.id) }
+  }
+  function cancel() {
+    const p = press.current
+    if (!p) return
+    press.current = null
+    clearTimeout(p.timer)
+    if (p.held) onHoldEnd?.()
+  }
   const { hs, nutY, H } = L
 
   // In auto mode, same-frequency companions (unison course pairs) are active too.
@@ -115,7 +164,7 @@ function GuitarHeadstock({
 
   return (
     <div className="relative w-full max-w-[340px] mx-auto">
-      <svg viewBox={`0 ${L.top} 300 ${L.VH}`} className="block w-full" aria-label="Guitar headstock tuner">
+      <svg viewBox={`0 ${L.top} 300 ${L.VH}`} className="block w-full select-none [-webkit-touch-callout:none]" aria-label="Guitar headstock tuner">
         <defs>
           <linearGradient id="hs-wood" x1="0" y1="0" x2="1" y2="0">
             <stop offset="0" style={{ stopColor: 'var(--wood-0)' }} />
@@ -197,7 +246,10 @@ function GuitarHeadstock({
           else if (act) { fill = sigKey === 'amber' ? 'rgba(251,191,36,0.14)' : 'rgba(56,189,248,0.14)'; stroke = activeColor; sw = 1.5 }
           return (
             <g key={`btn-${s.id}`} className="cursor-pointer" role="button" aria-label={`${s.label}${locked ? ', locked' : ''}`}
-               onClick={() => { onPlay(s.freq); onStringSelect(s.id) }}>
+               style={{ touchAction: 'none' }}
+               onPointerDown={e => down(e, s)} onPointerUp={() => up(s)}
+               onPointerLeave={cancel} onPointerCancel={cancel}
+               onContextMenu={e => e.preventDefault()}>
               <circle cx={x} cy={y} r={L.buttonR} strokeWidth={sw}
                 style={{ fill, stroke, transition: 'fill 120ms, stroke 120ms' }} />
               {marked && (

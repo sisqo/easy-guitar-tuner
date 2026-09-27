@@ -23,6 +23,13 @@ export function getTunings(diapason = 440) {
         openG:       { label: 'Open G',                  strings: buildStrings([['D',2],['G',2],['D',3],['G',3],['B',3],['D',4]], diapason) },
         openD:       { label: 'Open D',                  strings: buildStrings([['D',2],['A',2],['D',3],['F#',3],['A',3],['D',4]], diapason) },
         dadgad:      { label: 'DADGAD',                  strings: buildStrings([['D',2],['A',2],['D',3],['G',3],['A',3],['D',4]], diapason) },
+        dropCsharp:  { label: 'Drop C#',                 strings: buildStrings([['C#',2],['G#',2],['C#',3],['F#',3],['A#',3],['D#',4]], diapason) },
+        openE:       { label: 'Open E',                  strings: buildStrings([['E',2],['B',2],['E',3],['G#',3],['B',3],['E',4]], diapason) },
+        openA:       { label: 'Open A',                  strings: buildStrings([['E',2],['A',2],['E',3],['A',3],['C#',4],['E',4]], diapason) },
+        openC:       { label: 'Open C',                  strings: buildStrings([['C',2],['G',2],['C',3],['G',3],['C',4],['E',4]], diapason) },
+        // The four bass strings an octave up — the high strings of a 12-string set.
+        // Still thickest-slot first, so G4 sits above B3 in the list.
+        nashville:   { label: 'Nashville',               strings: buildStrings([['E',3],['A',3],['D',4],['G',4],['B',3],['E',4]], diapason) },
       },
     },
 

@@ -2,7 +2,9 @@ const FRETS = 4
 
 // Vertical chord chart: nut at top, strings as columns, frets as rows.
 // Reads a chords-db position { frets, fingers, barres, baseFret }.
-export default function ChordDiagram({ position, strings = 6, accentSet, dark = true, small = false }) {
+// `mirrored` draws it the way a left-handed player sees their own neck: the low
+// string on the right.
+export default function ChordDiagram({ position, strings = 6, accentSet, dark = true, small = false, mirrored = false }) {
   const sGap = 22
   const fGap = 26
   const padX = 20
@@ -19,7 +21,7 @@ export default function ChordDiagram({ position, strings = 6, accentSet, dark = 
   const y0 = padTop
   const W = boardW + padX * 2
   const H = boardH + padTop + padBottom
-  const sx = (i) => x0 + i * sGap
+  const sx = (i) => x0 + (mirrored ? strings - 1 - i : i) * sGap
   const fy = (r) => y0 + r * fGap
   const dotY = (f) => fy(f) - fGap / 2
   const markY = y0 - 11
@@ -60,7 +62,7 @@ export default function ChordDiagram({ position, strings = 6, accentSet, dark = 
         const fg = position.fingers?.[a] ?? 0
         return (
           <g key={`b${k}`}>
-            <rect x={sx(a) - 8} y={dotY(bf) - 8} width={(b - a) * sGap + 16} height="16" rx="8" fill={dotFill} />
+            <rect x={Math.min(sx(a), sx(b)) - 8} y={dotY(bf) - 8} width={(b - a) * sGap + 16} height="16" rx="8" fill={dotFill} />
             {fg > 0 && (
               <text x={sx(a)} y={dotY(bf) + 0.5} textAnchor="middle" dominantBaseline="middle"
                 fontSize="10" fontWeight="700" fill={dotText} fontFamily="'Geist Mono', monospace">{fg}</text>

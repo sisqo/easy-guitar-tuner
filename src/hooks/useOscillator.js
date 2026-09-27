@@ -11,6 +11,8 @@ function makePluckWave(ctx) {
   return ctx.createPeriodicWave(real, imag, { disableNormalization: false })
 }
 
+const HOLD_MAX_S = 30
+
 export function useOscillator() {
   const ctxRef = useRef(null)
   const waveRef = useRef(null)
@@ -64,6 +66,47 @@ export function useOscillator() {
     oscRef.current = voice(ctx, frequency, ctx.currentTime, duration, 0.9, ctx.destination)
   }, [ensureCtx, voice])
 
+  // A sustained reference for tuning by ear: sounds from startTone until stopTone
+  // (or HOLD_MAX_S, so a lost pointerup cannot leave it droning).
+  const holdRef = useRef(null)
+  const stopTone = useCallback(() => {
+    const h = holdRef.current
+    if (!h) return
+    holdRef.current = null
+    const t = h.ctx.currentTime
+    h.gain.gain.cancelScheduledValues(t)
+    h.gain.gain.setValueAtTime(h.gain.gain.value, t)
+    h.gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.12)
+    try { h.osc.stop(t + 0.13) } catch { /* already stopped */ }
+  }, [])
+
+  const startTone = useCallback((frequency) => {
+    const ctx = ensureCtx()
+    stopTone()
+    if (oscRef.current) { try { oscRef.current.stop() } catch { /* already stopped */ } oscRef.current = null }
+    const t = ctx.currentTime
+    const gain = ctx.createGain()
+    gain.gain.setValueAtTime(0.0001, t)
+    gain.gain.exponentialRampToValueAtTime(0.5, t + 0.03)
+    const filter = ctx.createBiquadFilter()
+    filter.type = 'lowpass'
+    filter.Q.value = 0.6
+    filter.frequency.value = Math.max(frequency * 4, 700)
+    const osc = ctx.createOscillator()
+    osc.setPeriodicWave(waveRef.current)
+    osc.frequency.value = frequency
+    osc.connect(filter)
+    filter.connect(gain)
+    gain.connect(ctx.destination)
+    osc.start(t)
+    osc.stop(t + HOLD_MAX_S)
+    osc.onended = () => {
+      try { gain.disconnect(); filter.disconnect() } catch { /* noop */ }
+      if (holdRef.current?.osc === osc) holdRef.current = null
+    }
+    holdRef.current = { ctx, osc, gain }
+  }, [ensureCtx, stopTone])
+
   // Strum a chord: MIDI notes triggered low -> high with a small stagger.
   const playChord = useCallback((midis, diapason = 440, { duration = 2.6, strum = 0.028 } = {}) => {
     if (!midis || !midis.length) return
@@ -86,5 +129,5 @@ export function useOscillator() {
     })
   }, [ensureCtx, voice])
 
-  return { playNote, playChord }
+  return { playNote, playChord, startTone, stopTone }
 }

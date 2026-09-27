@@ -84,6 +84,9 @@ function AutoToggle({ lockedStringId, activeStringId, strings, onToggle }) {
 export default function App() {
   const [dark, setDark] = useLocalStorage('egt-dark', true)
   const [instrument, setInstrument] = useLocalStorage('egt-instrument', 'guitar6')
+  const [lefty, setLefty] = useLocalStorage('egt-lefty', false)
+  // A sustained reference tone is sounding (a headstock button held down)
+  const [refHeld, setRefHeld] = useState(false)
   const [tuningKey, setTuningKey] = useLocalStorage('egt-tuning', 'standard')
   const [lockedStringId, setLockedStringId] = useState(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -150,7 +153,10 @@ export default function App() {
   useEffect(() => { stringsRef.current = strings }, [strings])
 
   const { isListening, pitch, settling, error, start, stop, statsRef } = usePitchDetector(settingsRef, stringsRef)
-  const { playNote, playChord } = useOscillator()
+  const { playNote, playChord, startTone, stopTone } = useOscillator()
+  // Stable, for the memoized headstock
+  const handleHoldStart = useCallback((freq) => { startTone(freq); setRefHeld(true) }, [startTone])
+  const handleHoldEnd = useCallback(() => { stopTone(); setRefHeld(false) }, [stopTone])
   const { beep } = useSuccessBeep()
   useWakeLock(isListening)
 
@@ -287,7 +293,9 @@ export default function App() {
   useEffect(() => { tunedRef.current = tunedStrings }, [tunedStrings])
 
   useEffect(() => {
-    if (!inTune || !displayNote) return
+    // While the reference tone is held the mic is hearing the app, not the string:
+    // that must not beep or mark anything tuned.
+    if (!inTune || !displayNote || refHeld) return
     const id = setTimeout(() => {
       beep()
       navigator.vibrate?.(TUNED_VIBRATE)
@@ -316,7 +324,7 @@ export default function App() {
       setTunedStrings(prev => { const next = new Set(prev); companions.forEach(cid => next.add(cid)); return next })
     }, IN_TUNE_BEEP_MS)
     return () => clearTimeout(id)
-  }, [inTune, displayNote, activeStringId, lockedStringId, beep, strings])
+  }, [inTune, displayNote, activeStringId, lockedStringId, beep, strings, refHeld])
 
   useEffect(() => {
     if (!tunedFlash) return
@@ -392,6 +400,7 @@ export default function App() {
               suffix={chordSuffix}
               onRootChange={setChordRoot}
               onSuffixChange={setChordSuffix}
+              lefty={lefty}
             />
           </main>
         ) : (
@@ -505,6 +514,9 @@ export default function App() {
                   tunedStrings={tunedStrings}
                   flash={tunedFlash}
                   turn={turn}
+                  mirrored={lefty}
+                  onHoldStart={handleHoldStart}
+                  onHoldEnd={handleHoldEnd}
                 />
               </div>}
               {chromatic && <div className="h-4" />}
@@ -539,6 +551,8 @@ export default function App() {
         onViewChange={handleViewChange}
         onNewTuning={openNewTuning}
         onEditTuning={openEditTuning}
+        lefty={lefty}
+        onToggleLefty={() => setLefty(v => !v)}
       />
 
       {editor && (

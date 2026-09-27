@@ -17,7 +17,7 @@ function splitNote(label) {
 export default function TunerBar({
   listening, cents, note, targetLabel = null, soundingNote = null, freq, settling = false,
   inTune = false, zoneCents = 3, displaySmooth = 0.22, barRange = 25, flashLabel = null,
-  idleHint = 'Pluck a string, or tap one below to lock it.',
+  idleHint = 'Pluck a string. Tap one below to lock it, hold it to hear it.',
 }) {
   // The segments step discretely, so displaySmooth now only sets how quickly a
   // segment fades between states. All the real smoothing is in pitchTracker, so

@@ -22,7 +22,7 @@ const Divider = () => <div className="h-px bg-line ml-[42px]" />
 export default function MenuSheet({
   open, onClose, dark, onToggleTheme, onOpenSettings, showInstallOption, onInstall,
   instrument, instruments, onInstrumentChange, tuningKey, tunings, onTuningChange,
-  view, onViewChange, onNewTuning, onEditTuning,
+  view, onViewChange, onNewTuning, onEditTuning, lefty, onToggleLefty,
 }) {
   function then(fn) { return (...a) => { onClose(); fn(...a) } }
 
@@ -91,6 +91,17 @@ export default function MenuSheet({
           </svg>
         }>
           {dark ? 'Light mode' : 'Dark mode'}
+        </Row>
+        <Divider />
+        <Row onClick={onToggleLefty} role="switch" aria-checked={lefty} icon={
+          <svg className="w-4 h-4 shrink-0 text-faint" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M7 16l-4-4 4-4M17 8l4 4-4 4M3 12h18" />
+          </svg>
+        }>
+          <span className="flex-1">Left-handed</span>
+          <span className={`w-9 h-5 rounded-full p-0.5 transition-colors ${lefty ? 'bg-brand' : 'bg-well border border-line'}`}>
+            <span className={`block w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${lefty ? 'translate-x-4' : ''}`} />
+          </span>
         </Row>
         {showInstallOption && (
           <>
