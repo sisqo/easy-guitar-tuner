@@ -62,13 +62,41 @@ const LAYOUTS = { 4: build(RAW[4]), 6: build(RAW[6]), 12: build(RAW[12]) }
 const SIG = { emerald: '#10b981', amber: '#fbbf24', sky: '#38bdf8', zinc: '#a1a1aa' }
 const LOCK = '#38bdf8'
 
+// Which way to turn a post, drawn as an arc around it in this front view. The
+// string leaves each post on its inner side, heading down to the nut, so raising
+// the pitch means that side of the post moving *away* from the nut: counter-
+// clockwise on the left, clockwise on the right. The gap in the arc faces the
+// button, clear of the string.
+function turnArrow([px, py], r, left, tighten) {
+  const cw = left !== tighten                 // left+tighten → CCW, right+tighten → CW
+  const sgn = cw ? 1 : -1                     // SVG angles grow clockwise (y is down)
+  const gap = left ? Math.PI : 0              // centre of the gap: towards the button
+  const a0 = gap + sgn * 0.9
+  const a1 = gap + sgn * (2 * Math.PI - 0.9)
+  const pt = (a, rr = r) => [px + rr * Math.cos(a), py + rr * Math.sin(a)]
+  const [x0, y0] = pt(a0)
+  const [x1, y1] = pt(a1)
+  // Chevron at the end, along the tangent
+  const tx = -Math.sin(a1) * sgn, ty = Math.cos(a1) * sgn
+  const nx = Math.cos(a1), ny = Math.sin(a1)
+  const h = r * 0.42
+  const tip = [x1 + tx * h * 0.6, y1 + ty * h * 0.6]
+  const b1 = [x1 - tx * h * 0.5 + nx * h, y1 - ty * h * 0.5 + ny * h]
+  const b2 = [x1 - tx * h * 0.5 - nx * h, y1 - ty * h * 0.5 - ny * h]
+  return {
+    arc: `M ${x0} ${y0} A ${r} ${r} 0 1 ${cw ? 1 : 0} ${x1} ${y1}`,
+    head: `M ${b1[0]} ${b1[1]} L ${tip[0]} ${tip[1]} L ${b2[0]} ${b2[1]}`,
+    cw,
+  }
+}
+
 function isSameFreq(a, b) {
   return a != null && b != null && Math.abs(a - b) < 0.01
 }
 
 function GuitarHeadstock({
   strings, activeStringId, activeFreq, lockedStringId, inTune = false, signal = null, listening = false,
-  onStringSelect, onPlay, tunedStrings, flash = null,
+  onStringSelect, onPlay, tunedStrings, flash = null, turn = null,
 }) {
   const L = LAYOUTS[strings.length] ?? LAYOUTS[6]
   const { hs, nutY, H } = L
@@ -83,6 +111,7 @@ function GuitarHeadstock({
   const activeColor = sigKey ? SIG[sigKey] : LOCK
 
   const flashIdx = flash ? strings.findIndex(s => s.id === flash.stringId) : -1
+  const leftSet = new Set(L.leftIndices)
 
   return (
     <div className="relative w-full max-w-[340px] mx-auto">
@@ -136,6 +165,23 @@ function GuitarHeadstock({
         {L.peg.map(([x, y], i) => (
           <circle key={`peg-${i}`} cx={x} cy={y} r={L.pegR * 0.8} fill="url(#hs-peg)" />
         ))}
+
+        {/* Which way to turn the active peg: `turn` is 'up' (tighten) or 'down' */}
+        {turn && strings.map((s, i) => {
+          if (!isActive(s)) return null
+          const a = turnArrow(L.peg[i], L.pegR * 1.6, leftSet.has(i), turn === 'up')
+          return (
+            <g key={`turn-${s.id}`} className="egt-turn" pointerEvents="none"
+              style={{
+                stroke: activeColor, transformBox: 'view-box',
+                transformOrigin: `${L.peg[i][0]}px ${L.peg[i][1]}px`,
+                '--turn': a.cw ? '28deg' : '-28deg',
+              }}>
+              <path d={a.arc} fill="none" strokeWidth="2" strokeLinecap="round" />
+              <path d={a.head} fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </g>
+          )
+        })}
 
         {/* Note buttons — a single tap toggles the lock and plays the reference tone */}
         {strings.map((s, i) => {

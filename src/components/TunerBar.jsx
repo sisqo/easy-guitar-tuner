@@ -17,6 +17,7 @@ function splitNote(label) {
 export default function TunerBar({
   listening, cents, note, targetLabel = null, soundingNote = null, freq, settling = false,
   inTune = false, zoneCents = 3, displaySmooth = 0.22, barRange = 25, flashLabel = null,
+  idleHint = 'Pluck a string, or tap one below to lock it.',
 }) {
   // The segments step discretely, so displaySmooth now only sets how quickly a
   // segment fades between states. All the real smoothing is in pitchTracker, so
@@ -108,7 +109,7 @@ export default function TunerBar({
               <svg className="w-[13px] h-[13px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
               Tap the mic
             </span>
-            <span className="text-xs leading-snug text-muted text-right">Pluck a string, or tap one below to lock it.</span>
+            <span className="text-xs leading-snug text-muted text-right">{idleHint}</span>
           </div>
         )}
       </div>

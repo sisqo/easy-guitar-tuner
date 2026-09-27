@@ -1,4 +1,4 @@
-import { noteFreq } from '../utils/noteUtils.js'
+import { noteFreq, noteToMidi, midiToNote } from '../utils/noteUtils.js'
 
 function buildStrings(pairs, diapason) {
   return pairs.map(([note, octave, label], i) => ({
@@ -65,5 +65,60 @@ export function getTunings(diapason = 440) {
         dTuning:  { label: 'D Tuning (ADF#B)',     strings: buildStrings([['A',4],['D',4],['F#',4],['B',4]], diapason) },
       },
     },
+
+    // No strings: the target is whatever note is nearest the reading (App.jsx).
+    // An empty list also turns off the tracker's octave correction, which only
+    // ever snaps onto a string.
+    chromatic: {
+      label: 'Chromatic',
+      chromatic: true,
+      tunings: {
+        standard: { label: 'Chromatic', strings: [] },
+      },
+    },
   }
+}
+
+// ── Custom tunings ────────────────────────────────────────────────────────────
+// Stored as one MIDI number per slot, lowest string first. A 12-string is edited
+// by course: the four bass courses get their octave string, the two treble
+// courses a unison one, as on a standard 12-string.
+
+// C2..D#5: inside the detector's 60–660 Hz with room for a string 50 cents out.
+// B1 (61.7 Hz) flat would fall under MIN_FREQ, and nothing below C2 has been benched.
+export const CUSTOM_MIDI_MIN = 36
+export const CUSTOM_MIDI_MAX = 75
+const OCTAVE_COURSES = 4
+
+export const customSlotCount = (instrument) => ({ guitar6: 6, guitar12: 6, ukulele: 4 })[instrument] ?? 0
+
+// The highest note a slot can take: a 12-string bass course needs room for its octave
+export const customSlotMax = (instrument, i) =>
+  instrument === 'guitar12' && i < OCTAVE_COURSES ? CUSTOM_MIDI_MAX - 12 : CUSTOM_MIDI_MAX
+
+export const customTuningKey = (id) => `custom:${id}`
+export const isCustomTuningKey = (key) => typeof key === 'string' && key.startsWith('custom:')
+
+// Slot MIDI numbers from a built-in or custom tuning's strings — the editor's starting point
+export function tuningToSlots(instrument, strings) {
+  const picked = instrument === 'guitar12' ? strings.filter((_, j) => j % 2 === 0) : strings
+  return picked.map(s => noteToMidi(s.note, s.octave))
+}
+
+export function buildCustomTuning(instrument, { name, notes }, diapason = 440) {
+  const pairs = []
+  notes.forEach((midi, i) => {
+    const { note, octave } = midiToNote(midi)
+    if (instrument !== 'guitar12') { pairs.push([note, octave]); return }
+    if (i < OCTAVE_COURSES) {
+      const hi = midiToNote(midi + 12)
+      // An octave string that shares its name with another course (D2 + D3 next
+      // to the D3 course) gets the ˡ mark, as in the built-in Drop D 12-string
+      const clash = notes.some((m, j) => j !== i && m === midi + 12)
+      pairs.push([note, octave], [hi.note, hi.octave, clash ? `${hi.note}${hi.octave}ˡ` : undefined])
+    } else {
+      pairs.push([note, octave], [note, octave, `${note}${octave}ʼ`])
+    }
+  })
+  return { label: name, custom: true, strings: buildStrings(pairs, diapason) }
 }

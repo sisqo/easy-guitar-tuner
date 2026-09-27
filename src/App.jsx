@@ -6,9 +6,10 @@ import { usePitchDetector } from './hooks/usePitchDetector'
 import { useOscillator } from './hooks/useOscillator'
 import { useSuccessBeep } from './hooks/useSuccessBeep'
 import { useInstallPrompt } from './hooks/useInstallPrompt'
-import { getTunings } from './data/tunings'
+import { useWakeLock } from './hooks/useWakeLock'
+import { getTunings, buildCustomTuning, customSlotCount, customTuningKey, tuningToSlots } from './data/tunings'
 import { DEFAULT_PRESET_ID } from './data/settings'
-import { findClosestString, freqToNoteName, getCents } from './utils/noteUtils'
+import { findClosestString, freqToNoteName, getCents, nearestNote } from './utils/noteUtils'
 import MenuSheet from './components/MenuSheet'
 import BottomSheet from './components/BottomSheet'
 import AppLogo from './components/AppLogo'
@@ -20,6 +21,7 @@ import PresetSelector from './components/PresetSelector'
 import ChordsView from './components/ChordsView'
 import DebugOverlay from './components/DebugOverlay'
 import InputLevel from './components/InputLevel'
+import TuningEditor from './components/TuningEditor'
 
 // How long the pitch must stay inside the in-tune zone before the success beep
 // fires. Shorter than it used to be because the zone itself is now ±3 cents:
@@ -33,6 +35,10 @@ const HYSTERESIS_CENTS = 2
 
 // How long "✓ E2 tuned" replaces the instruction, and the button's ring plays
 const TUNED_FLASH_MS = 1400
+
+// Short-long-short when a string is marked tuned — for whoever cannot hear the
+// beep over the room. Android only; iOS Safari has no Vibration API.
+const TUNED_VIBRATE = [30, 50, 60]
 
 function AutoToggle({ lockedStringId, activeStringId, strings, onToggle }) {
   const isLocked = lockedStringId !== null
@@ -90,6 +96,10 @@ export default function App() {
   const [view, setView] = useState('tuner')
   const [chordRoot, setChordRoot] = useState('C')
   const [chordSuffix, setChordSuffix] = useState('major')
+  // { [instrument]: [{ id, name, notes: [midi, …] }] } — see tunings.js
+  const [customTunings, setCustomTunings] = useLocalStorage('egt-custom-tunings', {})
+  // The open tuning editor: { id (null for a new one), initial, key }
+  const [editor, setEditor] = useState(null)
 
   const { canInstall, isIOS, showInstallOption, install } = useInstallPrompt()
 
@@ -113,7 +123,21 @@ export default function App() {
   }, [dark])
 
   const allTunings = useMemo(() => getTunings(settings.diapason), [settings.diapason])
-  const instrumentData = allTunings[instrument]
+  const baseInstrument = allTunings[instrument] ?? allTunings.guitar6
+  const chromatic = !!baseInstrument.chromatic
+  // The user's own tunings sit after the built-ins, rebuilt at the current diapason.
+  // Anything stored with the wrong number of slots (a hand-edited or older entry) is skipped.
+  const customList = useMemo(() => {
+    const list = Array.isArray(customTunings?.[instrument]) ? customTunings[instrument] : []
+    return list.filter(t => t && typeof t.name === 'string' && Array.isArray(t.notes)
+      && t.notes.length === customSlotCount(instrument) && t.notes.every(Number.isFinite))
+  }, [customTunings, instrument])
+  const instrumentData = useMemo(() => {
+    if (!customList.length) return baseInstrument
+    const custom = Object.fromEntries(customList.map(t =>
+      [customTuningKey(t.id), buildCustomTuning(instrument, t, settings.diapason)]))
+    return { ...baseInstrument, tunings: { ...baseInstrument.tunings, ...custom } }
+  }, [baseInstrument, customList, instrument, settings.diapason])
   const safeTuningKey = instrumentData.tunings[tuningKey] ? tuningKey : 'standard'
   const strings = instrumentData.tunings[safeTuningKey].strings
   const instrumentOptions = useMemo(
@@ -128,6 +152,7 @@ export default function App() {
   const { isListening, pitch, settling, error, start, stop, statsRef } = usePitchDetector(settingsRef, stringsRef)
   const { playNote, playChord } = useOscillator()
   const { beep } = useSuccessBeep()
+  useWakeLock(isListening)
 
   const resetTuned = useCallback(() => {
     setTunedStrings(new Set())
@@ -165,6 +190,33 @@ export default function App() {
     setLockedStringId(prev => prev === stringId ? null : stringId)
   }, [])
 
+  function openNewTuning() {
+    // Starts from whatever is selected: most custom tunings are one or two strings off a known one
+    setEditor({ id: null, initial: { name: '', notes: tuningToSlots(instrument, strings) }, key: Date.now() })
+  }
+  function openEditTuning() {
+    const t = customList.find(c => customTuningKey(c.id) === safeTuningKey)
+    if (t) setEditor({ id: t.id, initial: { name: t.name, notes: t.notes }, key: Date.now() })
+  }
+  function saveTuning({ name, notes }) {
+    const id = editor.id ?? Date.now().toString(36)
+    setCustomTunings(prev => {
+      const list = Array.isArray(prev?.[instrument]) ? prev[instrument] : []
+      const next = editor.id !== null
+        ? list.map(t => (t.id === id ? { id, name, notes } : t))
+        : [...list, { id, name, notes }]
+      return { ...prev, [instrument]: next }
+    })
+    handleTuningChange(customTuningKey(id))
+    setEditor(null)
+  }
+  function deleteTuning() {
+    const id = editor.id
+    setCustomTunings(prev => ({ ...prev, [instrument]: (prev?.[instrument] ?? []).filter(t => t.id !== id) }))
+    handleTuningChange('standard')
+    setEditor(null)
+  }
+
   function handleInstall() {
     if (canInstall) {
       install()
@@ -178,9 +230,11 @@ export default function App() {
   // sixty cents flat read "D#2" next to "−60" — two labels, two references. When
   // what is sounding is a different note, it is shown separately as `soundingNote`.
   const { displayNote, soundingNote, displayCents, activeStringId, activeFreq } = useMemo(() => {
-    const target = lockedStringId !== null
-      ? strings.find(s => s.id === lockedStringId) ?? null
-      : findClosestString(pitch, strings)
+    const target = chromatic
+      ? nearestNote(pitch, settings.diapason)
+      : lockedStringId !== null
+        ? strings.find(s => s.id === lockedStringId) ?? null
+        : findClosestString(pitch, strings)
     if (!pitch || !target) {
       return { displayNote: null, soundingNote: null, displayCents: 0, activeStringId: lockedStringId, activeFreq: target?.freq ?? null }
     }
@@ -195,7 +249,7 @@ export default function App() {
       activeStringId: target.id,
       activeFreq: target.freq,
     }
-  }, [lockedStringId, pitch, strings, settings.diapason])
+  }, [chromatic, lockedStringId, pitch, strings, settings.diapason])
 
   // One latched in-tune verdict for the whole app: the bar, the headstock ring and
   // the beep all read this, so they can never contradict each other.
@@ -236,22 +290,43 @@ export default function App() {
     if (!inTune || !displayNote) return
     const id = setTimeout(() => {
       beep()
-      if (activeStringId !== null) {
-        // Mark all same-frequency strings as tuned (covers unison pairs like B3/B3')
-        const active = strings.find(s => s.id === activeStringId)
-        const companions = strings.filter(s => active && Math.abs(s.freq - active.freq) < 0.01).map(s => s.id)
-        if (!tunedRef.current.has(activeStringId)) {
-          setTunedFlash({ stringId: activeStringId, label: active.label, key: Date.now() })
+      navigator.vibrate?.(TUNED_VIBRATE)
+      // Chromatic has no strings to mark
+      const active = strings.find(s => s.id === activeStringId)
+      if (!active) return
+      // Mark all same-frequency strings as tuned (covers unison pairs like B3/B3')
+      const companions = strings.filter(s => Math.abs(s.freq - active.freq) < 0.01).map(s => s.id)
+      if (!tunedRef.current.has(activeStringId)) {
+        const tuned = new Set([...tunedRef.current, ...companions])
+        const flash = {
+          stringId: activeStringId,
+          label: tuned.size === strings.length ? 'All strings' : active.label,
+          key: Date.now(),
         }
-        setTunedStrings(prev => { const next = new Set(prev); companions.forEach(cid => next.add(cid)); return next })
+        // Guided tuning: with a string locked, the lock moves on to the next one
+        // not yet tuned (lowest first, wrapping) once the flash has played, and
+        // lets go when there is none left.
+        if (lockedStringId !== null) {
+          const i = strings.findIndex(s => s.id === activeStringId)
+          const next = [...strings.slice(i + 1), ...strings.slice(0, i)].find(s => !tuned.has(s.id))
+          flash.advanceTo = next?.id ?? null
+        }
+        setTunedFlash(flash)
       }
+      setTunedStrings(prev => { const next = new Set(prev); companions.forEach(cid => next.add(cid)); return next })
     }, IN_TUNE_BEEP_MS)
     return () => clearTimeout(id)
-  }, [inTune, displayNote, activeStringId, beep, strings])
+  }, [inTune, displayNote, activeStringId, lockedStringId, beep, strings])
 
   useEffect(() => {
     if (!tunedFlash) return
-    const id = setTimeout(() => setTunedFlash(null), TUNED_FLASH_MS)
+    const id = setTimeout(() => {
+      setTunedFlash(null)
+      // Only if the user has not moved the lock themselves in the meantime
+      if ('advanceTo' in tunedFlash) {
+        setLockedStringId(prev => (prev === tunedFlash.stringId ? tunedFlash.advanceTo : prev))
+      }
+    }, TUNED_FLASH_MS)
     return () => clearTimeout(id)
   }, [tunedFlash])
 
@@ -259,12 +334,16 @@ export default function App() {
   // crosses zero or settles, so the memoized headstock still skips nearly every
   // reading.
   const signal = !displayNote ? null : inTune ? 'emerald' : settling ? 'zinc' : displayCents > 0 ? 'amber' : 'sky'
+  // Which way to turn the peg — only once the reading has settled and says which
+  const turn = signal === 'amber' ? 'down' : signal === 'sky' ? 'up' : null
 
   const tuning = instrumentData.tunings[safeTuningKey]
   // "Standard · EADGBE": for a 12-string, one letter per course
   const subtitle = view === 'chords'
-    ? `Chords · ${instrumentData.label}`
-    : `${tuning.label.split('(')[0].trim()} · ${(strings.length === 12 ? strings.filter((_, j) => j % 2 === 0) : strings)
+    ? `Chords · ${chromatic ? 'Guitar' : instrumentData.label}`
+    : chromatic
+      ? `Chromatic · A4 = ${settings.diapason} Hz`
+      : `${tuning.label.split('(')[0].trim()} · ${(strings.length === 12 ? strings.filter((_, j) => j % 2 === 0) : strings)
         .map(s => s.note.replace('#', '♯')).join('')}`
   const lockedLabel = lockedStringId !== null ? strings.find(s => s.id === lockedStringId)?.label ?? null : null
 
@@ -321,12 +400,14 @@ export default function App() {
                 to compare two configurations mid-session */}
             <div className="flex items-center justify-center gap-3 min-h-[60px]">
               <MicButton listening={isListening} onStart={start} onStop={handleStop} />
-              <AutoToggle
-                lockedStringId={lockedStringId}
-                activeStringId={activeStringId}
-                strings={strings}
-                onToggle={handleLockToggle}
-              />
+              {!chromatic && (
+                <AutoToggle
+                  lockedStringId={lockedStringId}
+                  activeStringId={activeStringId}
+                  strings={strings}
+                  onToggle={handleLockToggle}
+                />
+              )}
               <PresetSelector
                 presets={preset.presets}
                 activeId={preset.activeId}
@@ -365,7 +446,7 @@ export default function App() {
                 <div className="flex items-center justify-between gap-3 h-6">
                   <span className="flex items-center gap-2 min-w-0 text-sm font-medium text-ink-2 whitespace-nowrap">
                     <span className="w-2 h-2 shrink-0 rounded-full" style={{ background: isListening ? '#10b981' : 'var(--note-idle)' }} />
-                    <span className="truncate">{isListening ? `Listening · ${lockedLabel ?? 'Auto'}` : 'Mic off'}</span>
+                    <span className="truncate">{isListening ? `Listening · ${chromatic ? 'Chromatic' : lockedLabel ?? 'Auto'}` : 'Mic off'}</span>
                   </span>
                   <div
                     className="flex items-center gap-2 shrink-0 transition-opacity"
@@ -404,12 +485,13 @@ export default function App() {
                   displaySmooth={settings.displaySmooth}
                   barRange={settings.barRange}
                   flashLabel={tunedFlash?.label ?? null}
+                  idleHint={chromatic ? 'Play any note.' : undefined}
                 />
                 {isListening && <InputLevel statsRef={statsRef} hasNote={displayNote !== null} />}
                 {settings.debugOverlay && isListening && <DebugOverlay statsRef={statsRef} />}
               </div>
 
-              <div className="relative flex justify-center px-2 pt-2 pb-1">
+              {!chromatic && <div className="relative flex justify-center px-2 pt-2 pb-1">
                 <GuitarHeadstock
                   strings={strings}
                   activeStringId={activeStringId}
@@ -422,8 +504,10 @@ export default function App() {
                   listening={isListening}
                   tunedStrings={tunedStrings}
                   flash={tunedFlash}
+                  turn={turn}
                 />
-              </div>
+              </div>}
+              {chromatic && <div className="h-4" />}
             </div>
           </main>
         )}
@@ -453,7 +537,23 @@ export default function App() {
         onTuningChange={handleTuningChange}
         view={view}
         onViewChange={handleViewChange}
+        onNewTuning={openNewTuning}
+        onEditTuning={openEditTuning}
       />
+
+      {editor && (
+        <TuningEditor
+          key={editor.key}
+          onClose={() => setEditor(null)}
+          instrument={instrument}
+          initial={editor.initial}
+          editing={editor.id !== null}
+          onSave={saveTuning}
+          onDelete={deleteTuning}
+          onPlay={playNote}
+          diapason={settings.diapason}
+        />
+      )}
 
       <SettingsPanel
         open={settingsOpen}

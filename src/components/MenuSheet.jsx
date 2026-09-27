@@ -22,7 +22,7 @@ const Divider = () => <div className="h-px bg-line ml-[42px]" />
 export default function MenuSheet({
   open, onClose, dark, onToggleTheme, onOpenSettings, showInstallOption, onInstall,
   instrument, instruments, onInstrumentChange, tuningKey, tunings, onTuningChange,
-  view, onViewChange,
+  view, onViewChange, onNewTuning, onEditTuning,
 }) {
   function then(fn) { return (...a) => { onClose(); fn(...a) } }
 
@@ -36,26 +36,39 @@ export default function MenuSheet({
 
       <div className="flex flex-col gap-2">
         <span className="text-xs font-medium text-muted px-0.5">Instrument</span>
-        <div className="grid grid-cols-3 gap-1.5">
+        <div className="grid grid-cols-4 gap-1.5">
           {instruments.map(i => (
             <Chip key={i.id} selected={i.id === instrument} onClick={() => onInstrumentChange(i.id)}
-              className="h-10 rounded-xl text-[13px]">
+              className="h-10 px-1 rounded-xl text-[13px]">
               {i.label}
             </Chip>
           ))}
         </div>
       </div>
 
-      {view !== 'chords' && (
+      {/* Chromatic has no strings, so nothing to choose here */}
+      {view !== 'chords' && instrument !== 'chromatic' && (
         <div className="flex flex-col gap-2">
           <span className="text-xs font-medium text-muted px-0.5">Tuning</span>
           <div className="flex flex-wrap gap-1.5">
             {Object.entries(tunings).map(([key, t]) => (
               <Chip key={key} selected={key === tuningKey} onClick={() => onTuningChange(key)}
-                className="h-9 px-3 rounded-full text-[13px]">
+                className="h-9 px-3 rounded-full text-[13px] max-w-full truncate">
                 {t.label.split('(')[0].trim()}
               </Chip>
             ))}
+            {/* A new tuning starts from the one selected; editing only applies to
+                the user's own — the built-ins stay as they are */}
+            <button onClick={then(onNewTuning)}
+              className="h-9 px-3 rounded-full text-[13px] font-medium border border-dashed border-line text-ink-2 hover:text-ink cursor-pointer whitespace-nowrap">
+              + New
+            </button>
+            {tunings[tuningKey]?.custom && (
+              <button onClick={then(onEditTuning)}
+                className="h-9 px-3 rounded-full text-[13px] font-medium border border-line bg-card text-ink-2 hover:text-ink cursor-pointer whitespace-nowrap">
+                Edit
+              </button>
+            )}
           </div>
         </div>
       )}

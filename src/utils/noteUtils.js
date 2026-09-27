@@ -43,3 +43,20 @@ export function findClosestString(frequency, strings) {
 export function isInTune(cents, threshold = 5) {
   return Math.abs(cents) <= threshold
 }
+
+export function midiToNote(midi) {
+  return { note: NOTE_NAMES[((midi % 12) + 12) % 12], octave: Math.floor(midi / 12) - 1 }
+}
+
+export function freqToMidi(freq, diapason = 440) {
+  return Math.round(69 + 12 * Math.log2(freq / diapason))
+}
+
+// Chromatic mode's target: the equal-tempered note nearest the reading, shaped
+// like a string so the rest of the app can measure against it unchanged.
+export function nearestNote(freq, diapason = 440) {
+  if (!freq || freq <= 0) return null
+  const midi = freqToMidi(freq, diapason)
+  const { note, octave } = midiToNote(midi)
+  return { id: `chromatic-${midi}`, label: `${note}${octave}`, note, octave, freq: midiToFreq(midi, diapason) }
+}

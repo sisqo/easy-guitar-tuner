@@ -31,7 +31,9 @@ tunings.js  →  App.jsx  →  usePitchDetector (audio graph + loop)
                         →  GuitarHeadstock (string buttons + lock + tuned markers)
 ```
 
-`App.jsx` is the single stateful root. Persistent state uses `useLocalStorage` (`instrument`, `tuningKey`, `diapason`, `dark`, and the two preset keys below). Transient state uses `useState`: `lockedStringId` (cleared on instrument/tuning change), `tunedStrings` (a `Set` of string IDs confirmed in tune, cleared on mic stop or instrument/tuning change), `settingsOpen`, `iosSheetOpen`.
+`App.jsx` is the single stateful root. Persistent state uses `useLocalStorage` (`instrument`, `tuningKey`, `diapason`, `dark`, `egt-custom-tunings`, and the two preset keys below). Transient state uses `useState`: `lockedStringId` (cleared on instrument/tuning change), `tunedStrings` (a `Set` of string IDs confirmed in tune, cleared on mic stop or instrument/tuning change), `settingsOpen`, `iosSheetOpen`, `editor` (the open `TuningEditor`).
+
+While the mic is on, `useWakeLock` holds a screen wake lock — both hands are on the guitar — and re-requests it whenever the page becomes visible again, since the browser drops it on hide.
 
 `useLocalStorage`'s setter is stable and reads the current value through a ref. It has to be both: preset actions are `useCallback`s that outlive the render they were created in, and two writes can land in the same tick. Reading `stored` straight from the render closure broke renaming a preset — the update was applied to the library as it stood when the callback was created, which was before any preset existed.
 
@@ -161,15 +163,21 @@ Tap when locked → `handleLockToggle(lockedStringId)` (unlocks). Tap when auto 
 
 ### Tuned markers
 
-When the beep fires (the dwell timer in `App.jsx`), the active string and its same-frequency companions are added to `tunedStrings` (a `Set`). `GuitarHeadstock` receives this set via the `tunedStrings` prop. A string with `tunedStrings.has(id) && !isActive` gets a faint emerald ring and a small emerald dot under its label (`.marker-appear`). Cleared on mic stop, instrument change, tuning change, or the reset button in the panel's status row.
+When the beep fires (the dwell timer in `App.jsx`), the phone also vibrates (`navigator.vibrate`, Android only), and the active string and its same-frequency companions are added to `tunedStrings` (a `Set`). `GuitarHeadstock` receives this set via the `tunedStrings` prop. A string with `tunedStrings.has(id) && !isActive` gets a faint emerald ring and a small emerald dot under its label (`.marker-appear`). Cleared on mic stop, instrument change, tuning change, or the reset button in the panel's status row.
 
-The first time a string is marked, App also sets `tunedFlash` for `TUNED_FLASH_MS`: `TunerBar` says "✓ E2 tuned" instead of "✓ In tune", and the headstock plays one ring (`.egt-pulse`) off that button. It hangs off the same timer as the beep — there is no second dwell clock — and reads `tunedStrings` through a ref, because as an effect dependency marking a string would restart the timer and beep again.
+The first time a string is marked, App also sets `tunedFlash` for `TUNED_FLASH_MS`: `TunerBar` says "✓ E2 tuned" instead of "✓ In tune", and the headstock plays one ring (`.egt-pulse`) off that button. It hangs off the same timer as the beep — there is no second dwell clock — and reads `tunedStrings` through a ref, because as an effect dependency marking a string would restart the timer and beep again. When that marks the last string the flash reads "✓ All strings tuned".
+
+**Guided tuning**: with a string locked, the flash also carries `advanceTo` — the next string not yet tuned, lowest first, wrapping — and when the flash ends the lock moves there (or lets go when none is left). It only moves if the lock is still on the string that was flashed, so a tap on another string during the flash wins. The reference tone is deliberately *not* played on advance: the mic is live and would hear it.
 
 ### Tuning data (`src/data/tunings.js`)
 
 All frequencies are derived at runtime from `noteFreq(note, octave, diapason)` so that changing the diapason instantly recalculates everything. The `getTunings(diapason)` function returns the full instrument/tuning tree.
 
 String ordering in arrays: **lowest pitch first** (index 0 = thickest string). The headstock layout maps these indices to physical peg positions.
+
+**Chromatic** is an instrument with `chromatic: true` and one tuning with no strings. App then measures against `nearestNote(pitch)` instead of a string, hides the lock chip and the headstock, and marks nothing tuned (the beep still fires). The empty list also switches off the tracker's octave correction, which only ever snaps onto a string. Its range is the detector's, 60–660 Hz.
+
+**Custom tunings** live in `egt-custom-tunings` as `{ [instrument]: [{ id, name, notes }] }`, one MIDI number per slot, and are merged after the built-ins under the key `custom:<id>` (`buildCustomTuning`, rebuilt at the current diapason; entries with the wrong slot count are skipped). A 12-string is edited by **course**: the four bass courses get an octave string, the two treble courses a unison one. Slots are clamped to C2..D♯5 (`CUSTOM_MIDI_MIN/MAX`: inside the detector's 60–660 Hz with room for a string 50¢ out — a flat B1 would fall under the floor, and nothing below C2 is benched), a bass course to an octave below that. An octave string whose name clashes with another course gets the `ˡ` mark, as in the built-in Drop D. `TuningEditor` starts a new tuning from the one selected; only custom tunings get Edit/Delete in `MenuSheet`.
 
 ### Headstock SVG (`GuitarHeadstock.jsx`)
 
@@ -181,6 +189,8 @@ String ordering in arrays: **lowest pitch first** (index 0 = thickest string). T
 String routing uses cubic Bézier paths from nut to peg. The view is cropped `CROP` (44) units below the nut and 4 units above the topmost button (`top`/`VH` in `build`), and a gradient fades the strings into the panel; label and pulse positions are percentages of that cropped box. Buttons sit outside the headstock rect (at `leftBtnX` / `rightBtnX`) and trigger `onStringSelect(stringId)` to toggle the lock; their labels are HTML spans laid over the SVG (percent positions), so they render in Geist.
 
 **Visual**: flat, dark wood gradient (`--wood-0` / `--wood-1`) with a top sheen, a flat bone nut, metal pegs. The active string takes the reading's colour (`signal` prop: App's `emerald`/`amber`/`sky`/`zinc`, or `null` with nothing measured; locked-without-reading is sky) and trembles (`egt-vib`) until in tune. `signal` only changes when the reading crosses zero or settles, so the memo still skips nearly every reading. All animations are off under `prefers-reduced-motion`.
+
+**Peg arrow** (`turn` prop, `'up'`/`'down'`, only once the reading is settled and out of tune): an arc around the active post saying which way to turn it, in this front view. Strings leave each post on its inner side, so tightening is counter-clockwise on the left and clockwise on the right; the arc's gap faces the button, clear of the string. `turn` changes with `signal`, so it costs the memo nothing.
 
 **12-string layout**: bass courses (E, A, D) on the left; treble courses (G, B, high e) on the right. Within each course pair the lower-pitched string is listed first (top peg). Courses sit in tight pairs at the nut; on the bass side each pair's octave string is the outer one, so the string going to the upper peg is the inner one and the two never cross.
 
